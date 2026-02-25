@@ -262,3 +262,112 @@ class PatternDetector:
             "base_low": float(base_low),
             "base_start_idx": base_start,
         }
+
+    def detect_double_bottom(self, df: pd.DataFrame) -> dict | None:
+        """Detect a double bottom (W-pattern) in recent price data.
+
+        Criteria:
+        - Two distinct lows within 5% of each other
+        - Second low may slightly undercut first (bullish shakeout)
+        - 15-40% depth from prior high
+        - Middle peak forms resistance / buy point
+
+        Returns:
+            Pattern dict with details, or None if no pattern found.
+        """
+        if len(df) < 200:
+            return None
+
+        closes = df["Close"]
+
+        # Look in the last ~9 months for the pattern
+        lookback = min(190, len(df) - 50)
+        recent = closes.iloc[-lookback:]
+
+        # Find the prior high (highest point before the decline)
+        prior_high_idx = recent.idxmax()
+        prior_high = recent[prior_high_idx]
+        prior_high_pos = recent.index.get_loc(prior_high_idx)
+
+        # Need enough data after the high for the W pattern
+        if prior_high_pos > lookback * 0.5:
+            return None
+
+        after_high = recent.iloc[prior_high_pos:]
+        if len(after_high) < 40:
+            return None
+
+        # Find troughs in the data after the high
+        troughs = self.find_local_troughs(after_high, window=8)
+        if len(troughs) < 2:
+            return None
+
+        # Get the two most prominent troughs (lowest prices)
+        trough_prices = [(t, float(after_high.iloc[t])) for t in troughs]
+        trough_prices.sort(key=lambda x: x[1])
+
+        first_trough_idx, first_low = trough_prices[0]
+        second_trough_idx, second_low = trough_prices[1]
+
+        # Ensure chronological order
+        if first_trough_idx > second_trough_idx:
+            first_trough_idx, first_low, second_trough_idx, second_low = (
+                second_trough_idx, second_low, first_trough_idx, first_low
+            )
+
+        # Check lows are within 5% of each other
+        low_diff_pct = abs(first_low - second_low) / max(first_low, second_low) * 100
+        if low_diff_pct > 5.0:
+            return None
+
+        # Need meaningful separation between the two lows (at least 3 weeks)
+        if (second_trough_idx - first_trough_idx) < 15:
+            return None
+
+        # Find the middle peak between the two troughs
+        between = after_high.iloc[first_trough_idx:second_trough_idx + 1]
+        if len(between) < 3:
+            return None
+        middle_peak = float(between.max())
+
+        # Check depth from prior high
+        base_low = min(first_low, second_low)
+        depth = (prior_high - base_low) / prior_high * 100
+
+        # Double bottom typically 15-40% deep
+        if depth < 15 or depth > 40:
+            return None
+
+        # Total base length
+        total_days = second_trough_idx + 10
+        base_length_weeks = total_days / 5
+
+        # Volume confirmation: declining volume into second low
+        volume_confirm = False
+        abs_first = after_high.index[first_trough_idx]
+        abs_second = after_high.index[second_trough_idx]
+        first_pos = df.index.get_loc(abs_first)
+        second_pos = df.index.get_loc(abs_second)
+        if first_pos > 5 and second_pos > 5:
+            vol_around_first = df["Volume"].iloc[first_pos - 5 : first_pos + 5].mean()
+            vol_around_second = df["Volume"].iloc[second_pos - 5 : second_pos + 5].mean()
+            if vol_around_first > 0:
+                volume_confirm = vol_around_second < vol_around_first
+
+        buy_point = round(middle_peak, 2)
+        current_price = round(float(closes.iloc[-1]), 2)
+        distance = round((current_price - buy_point) / buy_point * 100, 2)
+
+        return {
+            "pattern_type": "Double Bottom",
+            "buy_point": buy_point,
+            "current_price": current_price,
+            "distance_to_pivot": distance,
+            "base_depth": round(depth, 2),
+            "base_length_weeks": int(round(base_length_weeks)),
+            "volume_confirmation": volume_confirm,
+            "first_low": round(first_low, 2),
+            "second_low": round(second_low, 2),
+            "middle_peak": round(middle_peak, 2),
+            "low_diff_pct": round(low_diff_pct, 2),
+        }

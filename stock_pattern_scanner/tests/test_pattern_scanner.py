@@ -171,3 +171,41 @@ def test_detect_flat_base_no_prior_uptrend():
     df = detector.add_moving_averages(df)
     result = detector.detect_flat_base(df)
     assert result is None
+
+
+def test_detect_double_bottom_valid():
+    """W-pattern with two lows within 3-5% of each other."""
+    detector = PatternDetector()
+
+    # Build: uptrend -> first low -> bounce -> second low -> recovery
+    uptrend = [100 + (50 * i / 100) for i in range(100)]     # 100 -> 150
+    decline1 = [150 - (30 * i / 30) for i in range(30)]       # 150 -> 120
+    bounce = [120 + (15 * i / 25) for i in range(25)]          # 120 -> 135
+    decline2 = [135 - (16 * i / 25) for i in range(25)]        # 135 -> 119
+    recovery = [119 + (14 * i / 30) for i in range(30)]        # 119 -> 133
+
+    closes = uptrend + decline1 + bounce + decline2 + recovery
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    result = detector.detect_double_bottom(df)
+    assert result is not None
+    assert result["pattern_type"] == "Double Bottom"
+
+
+def test_detect_double_bottom_lows_too_far_apart():
+    """Two lows more than 5% apart should NOT match."""
+    detector = PatternDetector()
+
+    uptrend = [100 + (50 * i / 100) for i in range(100)]
+    decline1 = [150 - (30 * i / 30) for i in range(30)]       # -> 120
+    bounce = [120 + (15 * i / 25) for i in range(25)]
+    decline2 = [135 - (35 * i / 25) for i in range(25)]        # -> 100 (too far from 120)
+    recovery = [100 + (14 * i / 30) for i in range(30)]
+
+    closes = uptrend + decline1 + bounce + decline2 + recovery
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    result = detector.detect_double_bottom(df)
+    assert result is None

@@ -209,3 +209,72 @@ def test_detect_double_bottom_lows_too_far_apart():
 
     result = detector.detect_double_bottom(df)
     assert result is None
+
+
+def test_detect_cup_and_handle_valid():
+    """U-shaped cup (12-33% depth) with small handle."""
+    detector = PatternDetector()
+
+    # Prior uptrend: 100 -> 150 (50% gain)
+    uptrend = [100 + (50 * i / 100) for i in range(100)]
+    # Cup left side: 150 -> 120 (20% decline)
+    left_side = [150 - (30 * i / 40) for i in range(40)]
+    # Cup bottom: rounded
+    bottom = [120 + 2 * np.sin(i * np.pi / 30) for i in range(30)]
+    # Cup right side: 120 -> 148
+    right_side = [120 + (28 * i / 40) for i in range(40)]
+    # Handle: small pullback 148 -> 142 -> 146
+    handle = [148 - (6 * i / 10) for i in range(10)] + [142 + (4 * i / 10) for i in range(10)]
+
+    closes = uptrend + left_side + bottom + right_side + handle
+    volumes = [1_000_000] * len(closes)
+    # Declining volume in handle
+    handle_start = len(uptrend) + len(left_side) + len(bottom) + len(right_side)
+    for i in range(handle_start, len(closes)):
+        volumes[i] = 500_000
+
+    df = _make_price_df(closes, volumes)
+    df = detector.add_moving_averages(df)
+
+    result = detector.detect_cup_and_handle(df)
+    assert result is not None
+    assert result["pattern_type"] in ("Cup & Handle", "Deep Cup & Handle")
+    assert 12 <= result["base_depth"] <= 33
+
+
+def test_detect_cup_and_handle_deep():
+    """Cup with 33-50% depth should be classified as Deep Cup & Handle."""
+    detector = PatternDetector()
+
+    uptrend = [100 + (60 * i / 100) for i in range(100)]      # 100 -> 160
+    left_side = [160 - (64 * i / 40) for i in range(40)]       # 160 -> 96 (40% decline)
+    bottom = [96 + 3 * np.sin(i * np.pi / 30) for i in range(30)]
+    right_side = [96 + (60 * i / 50) for i in range(50)]       # 96 -> 156
+    handle = [156 - (8 * i / 10) for i in range(10)] + [148 + (6 * i / 10) for i in range(10)]
+
+    closes = uptrend + left_side + bottom + right_side + handle
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    result = detector.detect_cup_and_handle(df)
+    assert result is not None
+    assert result["pattern_type"] == "Deep Cup & Handle"
+
+
+def test_detect_cup_and_handle_too_shallow():
+    """Cup with <12% depth should NOT match."""
+    detector = PatternDetector()
+
+    uptrend = [100 + (50 * i / 100) for i in range(100)]
+    # Only 8% decline — too shallow
+    left_side = [150 - (12 * i / 40) for i in range(40)]
+    bottom = [138 + 1 * np.sin(i * np.pi / 30) for i in range(30)]
+    right_side = [138 + (10 * i / 40) for i in range(40)]
+    handle = [148 - (3 * i / 10) for i in range(10)] + [145 + (2 * i / 10) for i in range(10)]
+
+    closes = uptrend + left_side + bottom + right_side + handle
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    result = detector.detect_cup_and_handle(df)
+    assert result is None

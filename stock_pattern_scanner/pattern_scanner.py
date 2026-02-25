@@ -371,3 +371,124 @@ class PatternDetector:
             "middle_peak": round(middle_peak, 2),
             "low_diff_pct": round(low_diff_pct, 2),
         }
+
+    def detect_cup_and_handle(self, df: pd.DataFrame) -> dict | None:
+        """Detect cup & handle or deep cup & handle pattern.
+
+        Criteria:
+        - Cup depth: 12-50% (12-33% = regular, 33-50% = deep)
+        - Handle: 1-6 weeks, <15% decline, declining volume
+        - Total duration: 7-65 weeks
+        - Prior 30%+ uptrend
+
+        Returns:
+            Pattern dict with details, or None if no pattern found.
+        """
+        if len(df) < 200:
+            return None
+
+        closes = df["Close"]
+
+        # Scan last 65 weeks (~325 trading days) for cup formation
+        max_lookback = min(325, len(df) - 50)
+        recent = closes.iloc[-max_lookback:]
+
+        # Find the cup's left lip (highest point before decline)
+        peaks = self.find_local_peaks(recent, window=15)
+        if not peaks:
+            return None
+
+        # Try each peak as potential left lip, starting from most recent viable ones
+        for peak_idx in reversed(peaks):
+            left_lip = float(recent.iloc[peak_idx])
+            left_lip_pos = peak_idx
+
+            # Need at least 35 days after left lip for cup + handle
+            if len(recent) - left_lip_pos < 35:
+                continue
+
+            # Check prior uptrend before the left lip
+            abs_pos = len(df) - max_lookback + left_lip_pos
+            if not self._has_prior_uptrend(df, abs_pos):
+                continue
+
+            after_lip = recent.iloc[left_lip_pos:]
+
+            # Find the cup low (lowest point after left lip)
+            cup_low_rel = after_lip.idxmin()
+            cup_low_pos = after_lip.index.get_loc(cup_low_rel)
+            cup_low = float(after_lip.iloc[cup_low_pos])
+
+            # Cup depth check
+            depth = (left_lip - cup_low) / left_lip * 100
+            if depth < 12.0 or depth > 50.0:
+                continue
+
+            # The cup low should be roughly in the middle, not at the very end
+            after_low = after_lip.iloc[cup_low_pos:]
+            if len(after_low) < 15:
+                continue
+
+            # Right side should recover close to left lip level
+            right_high = float(after_low.max())
+            right_high_pos = int(after_low.values.argmax())
+            recovery_pct = (right_high - cup_low) / (left_lip - cup_low) * 100
+
+            if recovery_pct < 70:
+                continue  # Right side hasn't recovered enough
+
+            # Look for handle: small pullback after right side recovery
+            after_right_high = after_low.iloc[right_high_pos:]
+            if len(after_right_high) < 5:
+                # No handle yet, but cup is forming
+                handle_low = float(after_low.iloc[-5:].min()) if len(after_low) >= 5 else cup_low
+                handle_decline = (right_high - handle_low) / right_high * 100
+            else:
+                handle_low = float(after_right_high.min())
+                handle_decline = (right_high - handle_low) / right_high * 100
+                handle_length_days = len(after_right_high)
+                handle_length_weeks = handle_length_days / 5
+
+                if handle_length_weeks > 6:
+                    continue  # Handle too long
+                if handle_decline > 15:
+                    continue  # Handle too deep
+
+            # Total base length
+            total_days = len(after_lip)
+            total_weeks = total_days / 5
+            if total_weeks < 7 or total_weeks > 65:
+                continue
+
+            # Classify as regular or deep
+            pattern_type = "Deep Cup & Handle" if depth > 33 else "Cup & Handle"
+
+            # Volume confirmation: declining volume in handle
+            volume_confirm = False
+            if "AvgVolume50" in df.columns and len(after_right_high) >= 5:
+                abs_right_high_pos = len(df) - len(after_right_high)
+                handle_vol = df["Volume"].iloc[abs_right_high_pos:].mean()
+                cup_vol = df["Volume"].iloc[abs_pos:abs_right_high_pos].mean()
+                if cup_vol > 0:
+                    volume_confirm = handle_vol < cup_vol * 0.85
+
+            buy_point = round(right_high, 2)
+            current_price = round(float(closes.iloc[-1]), 2)
+            distance = round((current_price - buy_point) / buy_point * 100, 2)
+
+            return {
+                "pattern_type": pattern_type,
+                "buy_point": buy_point,
+                "current_price": current_price,
+                "distance_to_pivot": distance,
+                "base_depth": round(depth, 2),
+                "base_length_weeks": int(round(total_weeks)),
+                "volume_confirmation": volume_confirm,
+                "left_lip": round(left_lip, 2),
+                "cup_low": round(cup_low, 2),
+                "right_high": round(right_high, 2),
+                "handle_low": round(handle_low, 2),
+                "recovery_pct": round(recovery_pct, 1),
+            }
+
+        return None

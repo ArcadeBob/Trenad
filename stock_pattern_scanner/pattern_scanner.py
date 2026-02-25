@@ -101,3 +101,164 @@ class PatternDetector:
 
         rs_raw = 50 + (weighted_stock - weighted_spy)
         return max(1, min(99, round(rs_raw, 1)))
+
+    def _has_prior_uptrend(self, df: pd.DataFrame, end_idx: int, min_gain: float = 30.0) -> bool:
+        """Check for *min_gain*% uptrend in the 6 months before *end_idx*.
+
+        The low must come before the high so that the move is an actual
+        uptrend (not a decline that happens to span 30 %+).
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Price data with a ``Close`` column.
+        end_idx : int
+            The positional index marking the end of the look-back window.
+        min_gain : float, optional
+            Minimum percentage gain required (default 30 %).
+
+        Returns
+        -------
+        bool
+            ``True`` when the conditions are met.
+        """
+        lookback = 126  # ~6 months of trading days
+        start_idx = max(0, end_idx - lookback)
+        segment = df["Close"].iloc[start_idx:end_idx]
+
+        if len(segment) < 20:
+            return False
+
+        low_pos = int(segment.values.argmin())
+        high_pos = int(segment.values.argmax())
+
+        # High must come AFTER the low (uptrend direction)
+        if high_pos <= low_pos:
+            return False
+
+        low_val = segment.values[low_pos]
+        high_val = segment.values[high_pos]
+
+        if low_val <= 0:
+            return False
+
+        gain_pct = (high_val - low_val) / low_val * 100
+        return gain_pct >= min_gain
+
+    def detect_flat_base(self, df: pd.DataFrame) -> dict | None:
+        """Detect a flat-base pattern in *df*.
+
+        Flat-base criteria
+        ------------------
+        * At least 200 data points available.
+        * Within the most recent 75 trading days, find a tight
+          consolidation range (high-to-low < 15 %).
+        * Walk backward from the end to determine where the
+          consolidation began; it must span at least 25 trading days
+          (~5 weeks).
+        * A 30 %+ prior uptrend in the 6 months before the base.
+        * More than 50 % of base days must close above the 50-day MA.
+        * Volume contraction: average volume in the base must be less
+          than 90 % of the average volume in the 50 days before the base.
+
+        Returns
+        -------
+        dict or None
+            A dict describing the pattern, or ``None`` when no flat base
+            is found.
+        """
+        if len(df) < 200:
+            return None
+
+        # --- Identify tight consolidation ------------------------------------
+        # Start with a narrow window (25 days = 5 weeks minimum) to get the
+        # core consolidation range, then expand backward while the range
+        # stays tight (< 15 %).
+        full_close = df["Close"].values
+        end_pos = len(df) - 1
+        max_window = min(75, len(df))
+
+        # Seed range from the most recent 25 days
+        seed = full_close[end_pos - 24 : end_pos + 1]
+        base_high = float(seed.max())
+        base_low = float(seed.min())
+
+        if base_low <= 0:
+            return None
+
+        # Expand backward day by day while price stays within the
+        # consolidation band.  Allow the band to widen only up to 15 %
+        # total depth, AND stop when a price falls below the seed low
+        # minus a small tolerance (half the seed range).  This prevents
+        # the base from creeping into a prior uptrend.
+        seed_range = base_high - base_low
+        floor = base_low - seed_range * 0.5
+
+        base_start = end_pos - 24
+        for i in range(end_pos - 25, end_pos - max_window, -1):
+            if i < 0:
+                break
+            price = full_close[i]
+            if price < floor:
+                break
+            new_high = max(base_high, price)
+            new_low = min(base_low, price)
+            depth = (new_high - new_low) / new_high * 100
+            if depth >= 15.0:
+                break
+            base_high = new_high
+            base_low = new_low
+            base_start = i
+
+        depth_pct = (base_high - base_low) / base_high * 100
+
+        if depth_pct >= 15.0:
+            return None
+
+        base_length = end_pos - base_start + 1
+
+        # Must be at least 5 weeks (~25 trading days)
+        if base_length < 25:
+            return None
+
+        # --- Prior uptrend check ----------------------------------------
+        if not self._has_prior_uptrend(df, base_start, min_gain=30.0):
+            return None
+
+        # --- 50-day MA check --------------------------------------------
+        if "MA50" not in df.columns:
+            return None
+
+        base_slice = df.iloc[base_start: end_pos + 1]
+        ma50_valid = base_slice["MA50"].dropna()
+        if len(ma50_valid) == 0:
+            return None
+
+        close_above_ma50 = (base_slice.loc[ma50_valid.index, "Close"] > ma50_valid).sum()
+        if close_above_ma50 / len(ma50_valid) <= 0.50:
+            return None
+
+        # --- Volume contraction -----------------------------------------
+        base_avg_vol = base_slice["Volume"].mean()
+        prior_start = max(0, base_start - 50)
+        prior_avg_vol = df["Volume"].iloc[prior_start:base_start].mean()
+
+        volume_ok = bool(base_avg_vol < prior_avg_vol * 0.90) if prior_avg_vol > 0 else False
+
+        # --- Build result -----------------------------------------------
+        current_price = float(full_close[-1])
+        buy_point = float(base_high)
+        distance_to_pivot = (current_price - buy_point) / buy_point * 100
+
+        return {
+            "pattern_type": "Flat Base",
+            "buy_point": buy_point,
+            "current_price": current_price,
+            "distance_to_pivot": round(distance_to_pivot, 2),
+            "base_depth": round(depth_pct, 2),
+            "base_length_weeks": base_length // 5,
+            "volume_confirmation": volume_ok,
+            "base_high": buy_point,
+            "base_low": float(base_low),
+            "base_start_idx": base_start,
+        }

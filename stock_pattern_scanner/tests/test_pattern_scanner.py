@@ -122,3 +122,52 @@ def test_calculate_relative_strength():
     spy_df = _make_price_df(spy_closes)
     rs = detector.calculate_relative_strength(stock_df, spy_df)
     assert rs > 80
+
+
+def test_detect_flat_base_valid():
+    """Tight consolidation <15% range after 30%+ uptrend."""
+    detector = PatternDetector()
+    # 30 days flat preamble + 140 day uptrend (100 -> 140, 40% gain) + 40 days flat = 210 total
+    # 126-day max gain in uptrend = 40*126/140 = 36% > 30% threshold
+    preamble = [100.0] * 30
+    uptrend = [100 + (40 * i / 140) for i in range(140)]
+    flat = [140 + 3 * np.sin(i * 0.3) for i in range(40)]
+    closes = preamble + uptrend + flat
+    volumes = [1_000_000] * len(closes)
+    flat_start = len(preamble) + len(uptrend)
+    for i in range(flat_start, len(closes)):
+        volumes[i] = 600_000
+    df = _make_price_df(closes, volumes)
+    df = detector.add_moving_averages(df)
+    result = detector.detect_flat_base(df)
+    assert result is not None
+    assert result["pattern_type"] == "Flat Base"
+    assert result["base_depth"] < 15.0
+    assert result["base_length_weeks"] >= 5
+
+
+def test_detect_flat_base_too_deep():
+    """Consolidation >15% should NOT be flat base."""
+    detector = PatternDetector()
+    preamble = [100.0] * 30
+    uptrend = [100 + (50 * i / 140) for i in range(140)]
+    # 20%+ range consolidation — too deep for flat base
+    deep_consol = [150 - (30 * i / 40) + (15 * (i % 2)) for i in range(40)]
+    closes = preamble + uptrend + deep_consol
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+    result = detector.detect_flat_base(df)
+    assert result is None
+
+
+def test_detect_flat_base_no_prior_uptrend():
+    """Flat consolidation without 30%+ prior uptrend should NOT match."""
+    detector = PatternDetector()
+    preamble = [100.0] * 30
+    uptrend = [100 + (10 * i / 140) for i in range(140)]
+    flat = [110 + 2 * np.sin(i * 0.3) for i in range(40)]
+    closes = preamble + uptrend + flat
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+    result = detector.detect_flat_base(df)
+    assert result is None

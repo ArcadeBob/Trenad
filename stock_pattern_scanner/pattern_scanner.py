@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 import numpy as np
 import pandas as pd
+import yfinance as yf
 from scipy.signal import argrelextrema
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -607,3 +612,122 @@ class PatternDetector:
                 score += 5
 
         return round(min(100, max(0, score)), 1)
+
+
+class StockScanner:
+    """Scans a list of tickers for base patterns using concurrent fetching."""
+
+    def __init__(self, tickers: list[str], max_workers: int = 5):
+        self.tickers = tickers
+        self.max_workers = max_workers
+        self.detector = PatternDetector()
+
+    def _fetch_data(self, ticker: str) -> pd.DataFrame | None:
+        """Fetch 2 years of historical data for a ticker."""
+        try:
+            t = yf.Ticker(ticker)
+            df = t.history(period="2y")
+            if df is None or len(df) < 200:
+                return None
+            return df
+        except Exception as e:
+            logger.warning("Failed to fetch data for %s: %s", ticker, e)
+            return None
+
+    def _analyze_ticker(
+        self, ticker: str, spy_df: pd.DataFrame
+    ) -> list[PatternResult]:
+        """Analyze a single ticker for all pattern types."""
+        df = self._fetch_data(ticker)
+        if df is None:
+            return []
+
+        df = self.detector.add_moving_averages(df)
+
+        results = []
+        current_price = round(float(df["Close"].iloc[-1]), 2)
+        above_50 = bool(
+            "MA50" in df.columns
+            and pd.notna(df["MA50"].iloc[-1])
+            and current_price > df["MA50"].iloc[-1]
+        )
+        above_200 = bool(
+            "MA200" in df.columns
+            and pd.notna(df["MA200"].iloc[-1])
+            and current_price > df["MA200"].iloc[-1]
+        )
+        rs_rating = self.detector.calculate_relative_strength(df, spy_df)
+
+        detectors = [
+            self.detector.detect_flat_base,
+            self.detector.detect_double_bottom,
+            self.detector.detect_cup_and_handle,
+        ]
+
+        for detect_fn in detectors:
+            try:
+                pattern = detect_fn(df)
+                if pattern is not None:
+                    confidence = self.detector.calculate_confidence(pattern, df)
+                    result = PatternResult(
+                        ticker=ticker,
+                        pattern_type=pattern["pattern_type"],
+                        confidence_score=confidence,
+                        buy_point=pattern["buy_point"],
+                        current_price=pattern["current_price"],
+                        distance_to_pivot=pattern["distance_to_pivot"],
+                        base_depth=pattern["base_depth"],
+                        base_length_weeks=pattern["base_length_weeks"],
+                        volume_confirmation=pattern["volume_confirmation"],
+                        above_50ma=above_50,
+                        above_200ma=above_200,
+                        rs_rating=rs_rating,
+                        pattern_details=pattern,
+                    )
+                    results.append(result)
+            except Exception as e:
+                logger.warning("Error detecting %s for %s: %s", detect_fn.__name__, ticker, e)
+
+        return results
+
+    def scan(
+        self,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> list[PatternResult]:
+        """Scan all tickers for patterns.
+
+        Args:
+            progress_callback: Called with (current_index, total, ticker_name) after each ticker.
+
+        Returns:
+            List of PatternResult sorted by confidence_score descending.
+        """
+        # Fetch SPY data for relative strength
+        spy_df = self._fetch_data("SPY")
+        if spy_df is None:
+            logger.error("Failed to fetch SPY data. RS ratings will be inaccurate.")
+            spy_df = pd.DataFrame({"Close": [100] * 252, "Volume": [1] * 252})
+
+        all_results: list[PatternResult] = []
+        total = len(self.tickers)
+        completed = 0
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_ticker = {
+                executor.submit(self._analyze_ticker, ticker, spy_df): ticker
+                for ticker in self.tickers
+            }
+            for future in as_completed(future_to_ticker):
+                ticker = future_to_ticker[future]
+                completed += 1
+                try:
+                    results = future.result()
+                    all_results.extend(results)
+                except Exception as e:
+                    logger.warning("Error scanning %s: %s", ticker, e)
+
+                if progress_callback:
+                    progress_callback(completed, total, ticker)
+
+        all_results.sort(key=lambda r: r.confidence_score, reverse=True)
+        return all_results

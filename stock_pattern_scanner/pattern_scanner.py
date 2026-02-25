@@ -492,3 +492,118 @@ class PatternDetector:
             }
 
         return None
+
+    def calculate_confidence(self, pattern: dict, df: pd.DataFrame) -> float:
+        """Calculate confidence score (0-100) for a detected pattern.
+
+        Scoring factors:
+        - Ideal depth range (20pts)
+        - Volume confirmation (15pts)
+        - Price above 50-day MA (15pts)
+        - Price above 200-day MA (10pts)
+        - Consolidation tightness (15pts)
+        - Base length in ideal range (10pts)
+        - Pattern-specific bonuses (15pts)
+        """
+        score = 0.0
+        pattern_type = pattern["pattern_type"]
+        depth = pattern.get("base_depth", 0)
+        length_weeks = pattern.get("base_length_weeks", 0)
+
+        # 1. Depth score (20 pts) — ideal ranges by pattern type
+        if pattern_type == "Flat Base":
+            if 5 <= depth <= 12:
+                score += 20
+            elif depth < 5:
+                score += 10
+            else:
+                score += max(0, 20 - (depth - 12) * 2)
+        elif pattern_type == "Double Bottom":
+            if 20 <= depth <= 30:
+                score += 20
+            else:
+                score += max(0, 20 - abs(depth - 25) * 1.5)
+        elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
+            if pattern_type == "Deep Cup & Handle":
+                ideal_center = 37
+            else:
+                ideal_center = 20
+            score += max(0, 20 - abs(depth - ideal_center) * 1.0)
+
+        # 2. Volume confirmation (15 pts)
+        if pattern.get("volume_confirmation"):
+            score += 15
+
+        # 3. Price above 50-day MA (15 pts)
+        current_close = df["Close"].iloc[-1]
+        above_50 = False
+        above_200 = False
+        if "MA50" in df.columns and pd.notna(df["MA50"].iloc[-1]):
+            if current_close > df["MA50"].iloc[-1]:
+                score += 15
+                above_50 = True
+
+        # 4. Price above 200-day MA (10 pts)
+        if "MA200" in df.columns and pd.notna(df["MA200"].iloc[-1]):
+            if current_close > df["MA200"].iloc[-1]:
+                score += 10
+                above_200 = True
+
+        # 5. Consolidation tightness (15 pts)
+        last_25 = df["Close"].iloc[-25:]
+        if len(last_25) >= 25:
+            weekly_range = (last_25.max() - last_25.min()) / last_25.mean() * 100
+            if weekly_range < 8:
+                score += 15
+            elif weekly_range < 12:
+                score += 10
+            elif weekly_range < 18:
+                score += 5
+
+        # 6. Base length (10 pts)
+        if pattern_type == "Flat Base":
+            ideal_weeks = (6, 12)
+        elif pattern_type == "Double Bottom":
+            ideal_weeks = (7, 20)
+        else:
+            ideal_weeks = (8, 30)
+
+        if ideal_weeks[0] <= length_weeks <= ideal_weeks[1]:
+            score += 10
+        elif length_weeks < ideal_weeks[0]:
+            score += 5
+        else:
+            score += max(0, 10 - (length_weeks - ideal_weeks[1]) * 0.5)
+
+        # 7. Pattern-specific bonuses (15 pts)
+        if pattern_type == "Double Bottom":
+            low_diff = pattern.get("low_diff_pct", 10)
+            if low_diff <= 3:
+                score += 10
+            elif low_diff <= 5:
+                score += 5
+            first = pattern.get("first_low", 0)
+            second = pattern.get("second_low", 0)
+            if second < first:
+                score += 5
+
+        elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
+            recovery = pattern.get("recovery_pct", 0)
+            if recovery >= 90:
+                score += 10
+            elif recovery >= 80:
+                score += 5
+            handle_low = pattern.get("handle_low", 0)
+            right_high = pattern.get("right_high", 1)
+            if right_high > 0:
+                handle_depth = (right_high - handle_low) / right_high * 100
+                if handle_depth < 8:
+                    score += 5
+
+        elif pattern_type == "Flat Base":
+            if above_50 and above_200:
+                score += 10
+            if depth < 10:
+                score += 5
+
+        return round(min(100, max(0, score)), 1)

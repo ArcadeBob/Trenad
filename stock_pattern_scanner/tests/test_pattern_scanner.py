@@ -278,3 +278,35 @@ def test_detect_cup_and_handle_too_shallow():
 
     result = detector.detect_cup_and_handle(df)
     assert result is None
+
+
+def test_confidence_score_high_quality():
+    """Pattern with all positive signals should score 60+."""
+    detector = PatternDetector()
+    pattern = {
+        "pattern_type": "Flat Base",
+        "base_depth": 10.0,
+        "volume_confirmation": True,
+        "base_length_weeks": 7,
+    }
+    df = _make_price_df(list(range(100, 300)))
+    df = detector.add_moving_averages(df)
+    score = detector.calculate_confidence(pattern, df)
+    assert score >= 60
+
+
+def test_confidence_score_low_quality():
+    """Pattern with negative signals should score below 60."""
+    detector = PatternDetector()
+    pattern = {
+        "pattern_type": "Cup & Handle",
+        "base_depth": 48.0,  # Very deep
+        "volume_confirmation": False,
+        "base_length_weeks": 60,  # Very long
+    }
+    # Declining prices — below MAs
+    closes = [200 - i * 0.5 for i in range(200)]
+    df = _make_price_df(closes)
+    df = detector.add_moving_averages(df)
+    score = detector.calculate_confidence(pattern, df)
+    assert score < 60

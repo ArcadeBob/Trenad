@@ -561,7 +561,7 @@
                     evtSource.close();
                     document.getElementById('progress-ticker').textContent = 'Scan complete!';
                     loadResults(scanId);
-                } else if (data.status === 'failed') {
+                } else if (data.status.startsWith('failed')) {
                     evtSource.close();
                     document.getElementById('progress-ticker').textContent = 'Scan failed.';
                     document.getElementById('scan-btn').disabled = false;

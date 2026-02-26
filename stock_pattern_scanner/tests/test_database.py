@@ -31,3 +31,62 @@ def test_save_and_get_results(tmp_db, make_pattern_result):
     assert results[0].confidence_score == 80.0
 
     assert tmp_db.get_scan_status(scan_id) == "completed"
+
+
+def test_create_backtest(tmp_db):
+    bt_id = tmp_db.create_backtest(
+        watchlist="default",
+        tickers=["AAPL", "MSFT"],
+        stop_loss_pct=7.0,
+        profit_target_pct=20.0,
+        min_confidence=40.0,
+    )
+    assert isinstance(bt_id, str)
+    assert len(bt_id) > 0
+
+
+def test_backtest_progress(tmp_db):
+    bt_id = tmp_db.create_backtest(
+        watchlist="default", tickers=["AAPL"],
+        stop_loss_pct=7.0, profit_target_pct=20.0, min_confidence=40.0,
+    )
+    tmp_db.update_backtest_progress(bt_id, current=5, total=50)
+    progress = tmp_db.get_backtest_progress(bt_id)
+    assert progress["current"] == 5
+    assert progress["total"] == 50
+    assert progress["status"] == "running"
+
+
+def test_save_and_get_backtest_trades(tmp_db):
+    bt_id = tmp_db.create_backtest(
+        watchlist="default", tickers=["AAPL"],
+        stop_loss_pct=7.0, profit_target_pct=20.0, min_confidence=40.0,
+    )
+    trades = [
+        {
+            "ticker": "AAPL",
+            "pattern_type": "Flat Base",
+            "confidence_score": 72.0,
+            "detection_date": "2025-06-15",
+            "entry_date": "2025-06-18",
+            "entry_price": 150.0,
+            "exit_date": "2025-07-10",
+            "exit_price": 180.0,
+            "exit_reason": "target",
+            "pnl_pct": 20.0,
+            "market_regime": "confirmed_uptrend",
+        },
+    ]
+    tmp_db.save_backtest_trades(bt_id, trades)
+    tmp_db.update_backtest_status(bt_id, "completed")
+    tmp_db.save_backtest_summary(bt_id, total_trades=1, win_rate=100.0, profit_factor=999.0)
+
+    result = tmp_db.get_backtest_trades(bt_id)
+    assert len(result) == 1
+    assert result[0]["ticker"] == "AAPL"
+    assert result[0]["pnl_pct"] == 20.0
+
+    summary = tmp_db.get_backtest_summary(bt_id)
+    assert summary["total_trades"] == 1
+    assert summary["win_rate"] == 100.0
+    assert summary["status"] == "completed"

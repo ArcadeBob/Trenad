@@ -88,6 +88,40 @@ class ScanDatabase:
                     FOREIGN KEY (scan_id) REFERENCES scans(scan_id)
                 );
             """)
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS backtests (
+                    backtest_id TEXT PRIMARY KEY,
+                    watchlist TEXT,
+                    tickers TEXT,
+                    stop_loss_pct REAL,
+                    profit_target_pct REAL,
+                    min_confidence REAL,
+                    status TEXT DEFAULT 'running',
+                    created_at TEXT,
+                    completed_at TEXT,
+                    progress_current INTEGER DEFAULT 0,
+                    progress_total INTEGER DEFAULT 0,
+                    total_trades INTEGER DEFAULT 0,
+                    win_rate REAL DEFAULT 0,
+                    profit_factor REAL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS backtest_trades (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    backtest_id TEXT,
+                    ticker TEXT,
+                    pattern_type TEXT,
+                    confidence_score REAL,
+                    detection_date TEXT,
+                    entry_date TEXT,
+                    entry_price REAL,
+                    exit_date TEXT,
+                    exit_price REAL,
+                    exit_reason TEXT,
+                    pnl_pct REAL,
+                    market_regime TEXT,
+                    FOREIGN KEY (backtest_id) REFERENCES backtests(backtest_id)
+                );
+            """)
             # Migrate: add columns that may be missing from older schemas
             migrations = [
                 ("results", "stop_loss_price", "REAL DEFAULT 0"),
@@ -201,3 +235,119 @@ class ScanDatabase:
                 trend_score=row["trend_score"] or 0.0,
             ))
         return results
+
+    # ------------------------------------------------------------------
+    # Backtest methods
+    # ------------------------------------------------------------------
+
+    def create_backtest(
+        self, watchlist: str, tickers: list[str],
+        stop_loss_pct: float, profit_target_pct: float, min_confidence: float,
+    ) -> str:
+        bt_id = str(uuid.uuid4())[:8]
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO backtests
+                   (backtest_id, watchlist, tickers, stop_loss_pct, profit_target_pct,
+                    min_confidence, status, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (bt_id, watchlist, json.dumps(tickers), stop_loss_pct,
+                 profit_target_pct, min_confidence, "running",
+                 datetime.now().isoformat()),
+            )
+        return bt_id
+
+    def update_backtest_progress(self, bt_id: str, current: int, total: int):
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE backtests SET progress_current=?, progress_total=? WHERE backtest_id=?",
+                (current, total, bt_id),
+            )
+
+    def get_backtest_progress(self, bt_id: str) -> dict:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM backtests WHERE backtest_id=?", (bt_id,),
+            ).fetchone()
+        if row is None:
+            return {"current": 0, "total": 0, "status": "not_found"}
+        return {
+            "current": row["progress_current"],
+            "total": row["progress_total"],
+            "status": row["status"],
+        }
+
+    def update_backtest_status(self, bt_id: str, status: str):
+        completed_at = datetime.now().isoformat() if status == "completed" else None
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE backtests SET status=?, completed_at=? WHERE backtest_id=?",
+                (status, completed_at, bt_id),
+            )
+
+    def save_backtest_trades(self, bt_id: str, trades: list[dict]):
+        with self._connect() as conn:
+            for t in trades:
+                conn.execute(
+                    """INSERT INTO backtest_trades
+                       (backtest_id, ticker, pattern_type, confidence_score,
+                        detection_date, entry_date, entry_price, exit_date,
+                        exit_price, exit_reason, pnl_pct, market_regime)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (bt_id, t["ticker"], t["pattern_type"], t["confidence_score"],
+                     t["detection_date"], t["entry_date"], t["entry_price"],
+                     t["exit_date"], t["exit_price"], t["exit_reason"],
+                     t["pnl_pct"], t["market_regime"]),
+                )
+
+    def save_backtest_summary(self, bt_id: str, total_trades: int, win_rate: float, profit_factor: float):
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE backtests SET total_trades=?, win_rate=?, profit_factor=? WHERE backtest_id=?",
+                (total_trades, win_rate, profit_factor, bt_id),
+            )
+
+    def get_backtest_trades(self, bt_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM backtest_trades WHERE backtest_id=? ORDER BY detection_date",
+                (bt_id,),
+            ).fetchall()
+        return [
+            {
+                "ticker": row["ticker"],
+                "pattern_type": row["pattern_type"],
+                "confidence_score": row["confidence_score"],
+                "detection_date": row["detection_date"],
+                "entry_date": row["entry_date"],
+                "entry_price": row["entry_price"],
+                "exit_date": row["exit_date"],
+                "exit_price": row["exit_price"],
+                "exit_reason": row["exit_reason"],
+                "pnl_pct": row["pnl_pct"],
+                "market_regime": row["market_regime"],
+            }
+            for row in rows
+        ]
+
+    def get_backtest_summary(self, bt_id: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM backtests WHERE backtest_id=?", (bt_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "backtest_id": row["backtest_id"],
+            "watchlist": row["watchlist"],
+            "tickers": json.loads(row["tickers"]),
+            "stop_loss_pct": row["stop_loss_pct"],
+            "profit_target_pct": row["profit_target_pct"],
+            "min_confidence": row["min_confidence"],
+            "status": row["status"],
+            "created_at": row["created_at"],
+            "completed_at": row["completed_at"],
+            "total_trades": row["total_trades"],
+            "win_rate": row["win_rate"],
+            "profit_factor": row["profit_factor"],
+        }

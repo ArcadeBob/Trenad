@@ -57,8 +57,8 @@ def _run_scan(scan_id: str, tickers: list[str], min_score: float):
         db.save_results(scan_id, results)
         db.update_status(scan_id, "completed")
     except Exception as e:
-        logger.error("Scan %s failed: %s", scan_id, e)
-        db.update_status(scan_id, "failed")
+        logger.error("Scan %s failed: %s", scan_id, e, exc_info=True)
+        db.update_status(scan_id, f"failed: {e}")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -117,7 +117,8 @@ async def scan_progress(scan_id: str):
             data = json.dumps(progress)
             yield f"data: {data}\n\n"
 
-            if progress["status"] in ("completed", "failed", "not_found"):
+            status = progress["status"]
+            if status in ("completed", "not_found") or status.startswith("failed"):
                 break
             await asyncio.sleep(SSE_POLL_INTERVAL)
 

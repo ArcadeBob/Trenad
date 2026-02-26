@@ -6,8 +6,8 @@ import asyncio
 import json
 import logging
 import os
+import tempfile
 import threading
-from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, Request
@@ -31,11 +31,7 @@ db = ScanDatabase(DB_PATH)
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    yield
-
-app = FastAPI(title="Stock Pattern Scanner", lifespan=lifespan)
+app = FastAPI(title="Stock Pattern Scanner")
 
 
 class ScanRequest(BaseModel):
@@ -146,7 +142,7 @@ async def export_excel(scan_id: str):
     if not results:
         return {"error": "No results found for this scan"}
 
-    filepath = f"scan_{scan_id}.xlsx"
+    filepath = os.path.join(tempfile.gettempdir(), f"scan_{scan_id}.xlsx")
     export_to_excel(results, filepath)
     return FileResponse(
         filepath,

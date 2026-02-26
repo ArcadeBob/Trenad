@@ -88,6 +88,20 @@ class ScanDatabase:
                     FOREIGN KEY (scan_id) REFERENCES scans(scan_id)
                 );
             """)
+            # Migrate: add columns that may be missing from older schemas
+            migrations = [
+                ("results", "stop_loss_price", "REAL DEFAULT 0"),
+                ("results", "profit_target_price", "REAL DEFAULT 0"),
+                ("results", "breakout_confirmed", "INTEGER DEFAULT NULL"),
+                ("results", "volume_surge_pct", "REAL DEFAULT NULL"),
+                ("results", "volume_rating", "TEXT DEFAULT 'C'"),
+                ("results", "trend_score", "REAL DEFAULT 0"),
+            ]
+            for table, col, col_type in migrations:
+                try:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
 
     def create_scan(self, watchlist: str, tickers: list[str]) -> str:
         scan_id = str(uuid.uuid4())[:8]

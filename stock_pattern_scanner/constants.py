@@ -194,3 +194,12 @@ SCORE_MINIMUM_VIABLE = 40.0
 # RS scoring thresholds
 RS_STRONG = 80.0
 RS_MODERATE = 60.0
+
+# ---------------------------------------------------------------------------
+# Backtesting
+# ---------------------------------------------------------------------------
+BACKTEST_SCAN_INTERVAL_DAYS = 5
+BACKTEST_DEFAULT_STOP_LOSS_PCT = 7.0
+BACKTEST_DEFAULT_PROFIT_TARGET_PCT = 20.0
+BACKTEST_DEFAULT_MIN_CONFIDENCE = 40.0
+BACKTEST_MAX_OPEN_TRADES_PER_TICKER = 1

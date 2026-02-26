@@ -7,6 +7,7 @@ import argparse
 import sys
 import time
 
+from constants import DEFAULT_MAX_WORKERS, DEFAULT_TOP_RESULTS, NEAR_PIVOT_THRESHOLD, PROGRESS_BAR_LENGTH
 from pattern_scanner import StockScanner
 from excel_export import export_to_excel
 from ticker_lists import resolve_watchlist
@@ -25,7 +26,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     parser.add_argument("--min-score", type=float, default=0, help="Minimum confidence score (0-100)")
     parser.add_argument("--near-pivot", action="store_true", help="Only show stocks within 5%% of buy point")
-    parser.add_argument("--top", type=int, default=50, help="Show top N results (default: 50)")
+    parser.add_argument("--top", type=int, default=DEFAULT_TOP_RESULTS, help="Show top N results (default: 50)")
     parser.add_argument("--no-excel", action="store_true", help="Skip Excel export")
     parser.add_argument("--output", metavar="FILE", default="pattern_scan.xlsx", help="Excel output filename")
     parser.add_argument("--web", action="store_true", help="Launch web dashboard instead of CLI scan")
@@ -50,7 +51,7 @@ def resolve_tickers(args: argparse.Namespace) -> list[str]:
 
 def print_progress(current: int, total: int, ticker: str):
     pct = current / total * 100 if total > 0 else 0
-    bar_len = 30
+    bar_len = PROGRESS_BAR_LENGTH
     filled = int(bar_len * current / total) if total > 0 else 0
     bar = "\u2588" * filled + "\u2591" * (bar_len - filled)
     print(f"\r  {bar} {pct:5.1f}% ({current}/{total}) {ticker:<8}", end="", flush=True)
@@ -100,7 +101,7 @@ def main():
 
     try:
         start_time = time.time()
-        scanner = StockScanner(tickers=tickers, max_workers=5)
+        scanner = StockScanner(tickers=tickers, max_workers=DEFAULT_MAX_WORKERS)
         results = scanner.scan(progress_callback=print_progress)
         elapsed = time.time() - start_time
     except KeyboardInterrupt:
@@ -116,7 +117,7 @@ def main():
     if args.min_score > 0:
         results = [r for r in results if r.confidence_score >= args.min_score]
     if args.near_pivot:
-        results = [r for r in results if abs(r.distance_to_pivot) <= 5.0]
+        results = [r for r in results if abs(r.distance_to_pivot) <= NEAR_PIVOT_THRESHOLD]
 
     results = results[: args.top]
     print_results_table(results)

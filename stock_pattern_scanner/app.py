@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from constants import DEFAULT_MAX_WORKERS, SSE_POLL_INTERVAL
 from database import ScanDatabase
 from excel_export import export_to_excel
 from pattern_scanner import StockScanner
@@ -46,7 +47,7 @@ def _run_scan(scan_id: str, tickers: list[str], min_score: float):
         db.update_progress(scan_id, current, total, ticker)
 
     try:
-        scanner = StockScanner(tickers=tickers, max_workers=5)
+        scanner = StockScanner(tickers=tickers, max_workers=DEFAULT_MAX_WORKERS)
         results = scanner.scan(progress_callback=progress_cb)
 
         if min_score > 0:
@@ -100,7 +101,7 @@ async def scan_progress(scan_id: str):
 
             if progress["status"] in ("completed", "failed", "not_found"):
                 break
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(SSE_POLL_INTERVAL)
 
     return StreamingResponse(
         event_generator(),

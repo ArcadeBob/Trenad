@@ -12,6 +12,85 @@ import pandas as pd
 import yfinance as yf
 from scipy.signal import argrelextrema
 
+from constants import (
+    BASE_LENGTH_OVER_PENALTY,
+    CUP_DEEP_IDEAL_DEPTH_CENTER,
+    CUP_DEEP_THRESHOLD_PCT,
+    CUP_DEPTH_PENALTY,
+    CUP_HANDLE_VOLUME_FACTOR,
+    CUP_HIGH_RECOVERY_PCT,
+    CUP_IDEAL_DEPTH_CENTER,
+    CUP_IDEAL_WEEKS,
+    CUP_LOOKBACK_BUFFER,
+    CUP_MAX_DEPTH_PCT,
+    CUP_MAX_LOOKBACK_DAYS,
+    CUP_MAX_TOTAL_WEEKS,
+    CUP_MIN_AFTER_LIP,
+    CUP_MIN_AFTER_LOW,
+    CUP_MIN_DEPTH_PCT,
+    CUP_MIN_HANDLE_DAYS,
+    CUP_MIN_RECOVERY_PCT,
+    CUP_MIN_TOTAL_WEEKS,
+    CUP_MODERATE_RECOVERY_PCT,
+    CUP_PEAK_WINDOW,
+    CUP_TIGHT_HANDLE_DEPTH_PCT,
+    DEFAULT_HISTORY_PERIOD,
+    DEFAULT_MAX_WORKERS,
+    DOUBLE_BOTTOM_DEPTH_CENTER,
+    DOUBLE_BOTTOM_DEPTH_PENALTY,
+    DOUBLE_BOTTOM_IDEAL_DEPTH_HIGH,
+    DOUBLE_BOTTOM_IDEAL_DEPTH_LOW,
+    DOUBLE_BOTTOM_IDEAL_WEEKS,
+    DOUBLE_BOTTOM_LOOKBACK_BUFFER,
+    DOUBLE_BOTTOM_LOOKBACK_DAYS,
+    DOUBLE_BOTTOM_LOW_DIFF_MAX_PCT,
+    DOUBLE_BOTTOM_MAX_DEPTH_PCT,
+    DOUBLE_BOTTOM_MIN_AFTER_HIGH,
+    DOUBLE_BOTTOM_MIN_DEPTH_PCT,
+    DOUBLE_BOTTOM_MIN_SEPARATION_DAYS,
+    DOUBLE_BOTTOM_MODERATE_LOW_DIFF,
+    DOUBLE_BOTTOM_TIGHT_LOW_DIFF,
+    DOUBLE_BOTTOM_TROUGH_WINDOW,
+    DOUBLE_BOTTOM_VOLUME_WINDOW,
+    FLAT_BASE_DEPTH_PENALTY,
+    FLAT_BASE_IDEAL_DEPTH_HIGH,
+    FLAT_BASE_IDEAL_DEPTH_LOW,
+    FLAT_BASE_IDEAL_WEEKS,
+    FLAT_BASE_MA50_THRESHOLD,
+    FLAT_BASE_MAX_DEPTH_PCT,
+    FLAT_BASE_MAX_WINDOW_DAYS,
+    FLAT_BASE_PRIOR_VOLUME_DAYS,
+    FLAT_BASE_SEED_DAYS,
+    FLAT_BASE_SEED_FLOOR_FACTOR,
+    FLAT_BASE_TIGHT_DEPTH_PCT,
+    FLAT_BASE_VOLUME_CONTRACTION,
+    HANDLE_MAX_DECLINE_PCT,
+    HANDLE_MAX_LENGTH_WEEKS,
+    MIN_DATA_POINTS,
+    PRIOR_UPTREND_LOOKBACK_DAYS,
+    PRIOR_UPTREND_MIN_GAIN_PCT,
+    PRIOR_UPTREND_MIN_SEGMENT_LEN,
+    RS_BASELINE,
+    RS_MAX,
+    RS_MIN,
+    RS_PERIODS,
+    RS_WEIGHTS,
+    SCORE_ABOVE_200MA_MAX,
+    SCORE_ABOVE_50MA_MAX,
+    SCORE_BASE_LENGTH_MAX,
+    SCORE_DEPTH_MAX,
+    SCORE_TIGHTNESS_MAX,
+    SCORE_VOLUME_MAX,
+    STATUS_AT_PIVOT_THRESHOLD,
+    STATUS_EXTENDED_THRESHOLD,
+    STATUS_NEAR_PIVOT_LOWER,
+    TIGHTNESS_LOOKBACK,
+    TIGHTNESS_LOOSE,
+    TIGHTNESS_MODERATE,
+    TIGHTNESS_TIGHT,
+    TRADING_DAYS_PER_YEAR,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,13 +118,13 @@ class PatternResult:
 
         Returns one of: 'At Pivot', 'Near Pivot', 'Building', 'Extended'
         """
-        if self.distance_to_pivot > 5.0:
+        if self.distance_to_pivot > STATUS_EXTENDED_THRESHOLD:
             return "Extended"
-        elif abs(self.distance_to_pivot) <= 1.0:
+        elif abs(self.distance_to_pivot) <= STATUS_AT_PIVOT_THRESHOLD:
             return "At Pivot"
-        elif -5.0 <= self.distance_to_pivot < -1.0:
+        elif STATUS_NEAR_PIVOT_LOWER <= self.distance_to_pivot < -STATUS_AT_PIVOT_THRESHOLD:
             return "Near Pivot"
-        elif self.distance_to_pivot < -5.0:
+        elif self.distance_to_pivot < STATUS_NEAR_PIVOT_LOWER:
             return "Building"
         else:
             # 1.0 < distance <= 5.0 (slightly above buy point but not extended)
@@ -82,8 +161,8 @@ class PatternDetector:
 
         Uses weighted blend: 40% recent quarter, 20% each for 6/9/12 months.
         """
-        periods = [63, 126, 189, 252]
-        weights = [0.4, 0.2, 0.2, 0.2]
+        periods = RS_PERIODS
+        weights = RS_WEIGHTS
 
         stock_close = stock_df["Close"]
         spy_close = spy_df["Close"]
@@ -104,10 +183,10 @@ class PatternDetector:
         weighted_stock = sum(r * w for r, w in zip(stock_returns, weights))
         weighted_spy = sum(r * w for r, w in zip(spy_returns, weights))
 
-        rs_raw = 50 + (weighted_stock - weighted_spy)
-        return max(1, min(99, round(rs_raw, 1)))
+        rs_raw = RS_BASELINE + (weighted_stock - weighted_spy)
+        return max(RS_MIN, min(RS_MAX, round(rs_raw, 1)))
 
-    def _has_prior_uptrend(self, df: pd.DataFrame, end_idx: int, min_gain: float = 30.0) -> bool:
+    def _has_prior_uptrend(self, df: pd.DataFrame, end_idx: int, min_gain: float = PRIOR_UPTREND_MIN_GAIN_PCT) -> bool:
         """Check for *min_gain*% uptrend in the 6 months before *end_idx*.
 
         The low must come before the high so that the move is an actual
@@ -127,11 +206,11 @@ class PatternDetector:
         bool
             ``True`` when the conditions are met.
         """
-        lookback = 126  # ~6 months of trading days
+        lookback = PRIOR_UPTREND_LOOKBACK_DAYS  # ~6 months of trading days
         start_idx = max(0, end_idx - lookback)
         segment = df["Close"].iloc[start_idx:end_idx]
 
-        if len(segment) < 20:
+        if len(segment) < PRIOR_UPTREND_MIN_SEGMENT_LEN:
             return False
 
         low_pos = int(segment.values.argmin())
@@ -172,7 +251,7 @@ class PatternDetector:
             A dict describing the pattern, or ``None`` when no flat base
             is found.
         """
-        if len(df) < 200:
+        if len(df) < MIN_DATA_POINTS:
             return None
 
         # --- Identify tight consolidation ------------------------------------
@@ -181,10 +260,10 @@ class PatternDetector:
         # stays tight (< 15 %).
         full_close = df["Close"].values
         end_pos = len(df) - 1
-        max_window = min(75, len(df))
+        max_window = min(FLAT_BASE_MAX_WINDOW_DAYS, len(df))
 
         # Seed range from the most recent 25 days
-        seed = full_close[end_pos - 24 : end_pos + 1]
+        seed = full_close[end_pos - (FLAT_BASE_SEED_DAYS - 1) : end_pos + 1]
         base_high = float(seed.max())
         base_low = float(seed.min())
 
@@ -197,10 +276,10 @@ class PatternDetector:
         # minus a small tolerance (half the seed range).  This prevents
         # the base from creeping into a prior uptrend.
         seed_range = base_high - base_low
-        floor = base_low - seed_range * 0.5
+        floor = base_low - seed_range * FLAT_BASE_SEED_FLOOR_FACTOR
 
-        base_start = end_pos - 24
-        for i in range(end_pos - 25, end_pos - max_window, -1):
+        base_start = end_pos - (FLAT_BASE_SEED_DAYS - 1)
+        for i in range(end_pos - FLAT_BASE_SEED_DAYS, end_pos - max_window, -1):
             if i < 0:
                 break
             price = full_close[i]
@@ -209,7 +288,7 @@ class PatternDetector:
             new_high = max(base_high, price)
             new_low = min(base_low, price)
             depth = (new_high - new_low) / new_high * 100
-            if depth >= 15.0:
+            if depth >= FLAT_BASE_MAX_DEPTH_PCT:
                 break
             base_high = new_high
             base_low = new_low
@@ -217,17 +296,17 @@ class PatternDetector:
 
         depth_pct = (base_high - base_low) / base_high * 100
 
-        if depth_pct >= 15.0:
+        if depth_pct >= FLAT_BASE_MAX_DEPTH_PCT:
             return None
 
         base_length = end_pos - base_start + 1
 
         # Must be at least 5 weeks (~25 trading days)
-        if base_length < 25:
+        if base_length < FLAT_BASE_SEED_DAYS:
             return None
 
         # --- Prior uptrend check ----------------------------------------
-        if not self._has_prior_uptrend(df, base_start, min_gain=30.0):
+        if not self._has_prior_uptrend(df, base_start, min_gain=PRIOR_UPTREND_MIN_GAIN_PCT):
             return None
 
         # --- 50-day MA check --------------------------------------------
@@ -240,15 +319,15 @@ class PatternDetector:
             return None
 
         close_above_ma50 = (base_slice.loc[ma50_valid.index, "Close"] > ma50_valid).sum()
-        if close_above_ma50 / len(ma50_valid) <= 0.50:
+        if close_above_ma50 / len(ma50_valid) <= FLAT_BASE_MA50_THRESHOLD:
             return None
 
         # --- Volume contraction -----------------------------------------
         base_avg_vol = base_slice["Volume"].mean()
-        prior_start = max(0, base_start - 50)
+        prior_start = max(0, base_start - FLAT_BASE_PRIOR_VOLUME_DAYS)
         prior_avg_vol = df["Volume"].iloc[prior_start:base_start].mean()
 
-        volume_ok = bool(base_avg_vol < prior_avg_vol * 0.90) if prior_avg_vol > 0 else False
+        volume_ok = bool(base_avg_vol < prior_avg_vol * FLAT_BASE_VOLUME_CONTRACTION) if prior_avg_vol > 0 else False
 
         # --- Build result -----------------------------------------------
         current_price = float(full_close[-1])
@@ -280,13 +359,13 @@ class PatternDetector:
         Returns:
             Pattern dict with details, or None if no pattern found.
         """
-        if len(df) < 200:
+        if len(df) < MIN_DATA_POINTS:
             return None
 
         closes = df["Close"]
 
         # Look in the last ~9 months for the pattern
-        lookback = min(190, len(df) - 50)
+        lookback = min(DOUBLE_BOTTOM_LOOKBACK_DAYS, len(df) - DOUBLE_BOTTOM_LOOKBACK_BUFFER)
         recent = closes.iloc[-lookback:]
 
         # Find the prior high (highest point before the decline)
@@ -299,11 +378,11 @@ class PatternDetector:
             return None
 
         after_high = recent.iloc[prior_high_pos:]
-        if len(after_high) < 40:
+        if len(after_high) < DOUBLE_BOTTOM_MIN_AFTER_HIGH:
             return None
 
         # Find troughs in the data after the high
-        troughs = self.find_local_troughs(after_high, window=8)
+        troughs = self.find_local_troughs(after_high, window=DOUBLE_BOTTOM_TROUGH_WINDOW)
         if len(troughs) < 2:
             return None
 
@@ -322,11 +401,11 @@ class PatternDetector:
 
         # Check lows are within 5% of each other
         low_diff_pct = abs(first_low - second_low) / max(first_low, second_low) * 100
-        if low_diff_pct > 5.0:
+        if low_diff_pct > DOUBLE_BOTTOM_LOW_DIFF_MAX_PCT:
             return None
 
         # Need meaningful separation between the two lows (at least 3 weeks)
-        if (second_trough_idx - first_trough_idx) < 15:
+        if (second_trough_idx - first_trough_idx) < DOUBLE_BOTTOM_MIN_SEPARATION_DAYS:
             return None
 
         # Find the middle peak between the two troughs
@@ -340,7 +419,7 @@ class PatternDetector:
         depth = (prior_high - base_low) / prior_high * 100
 
         # Double bottom typically 15-40% deep
-        if depth < 15 or depth > 40:
+        if depth < DOUBLE_BOTTOM_MIN_DEPTH_PCT or depth > DOUBLE_BOTTOM_MAX_DEPTH_PCT:
             return None
 
         # Total base length
@@ -353,9 +432,9 @@ class PatternDetector:
         abs_second = after_high.index[second_trough_idx]
         first_pos = df.index.get_loc(abs_first)
         second_pos = df.index.get_loc(abs_second)
-        if first_pos > 5 and second_pos > 5:
-            vol_around_first = df["Volume"].iloc[first_pos - 5 : first_pos + 5].mean()
-            vol_around_second = df["Volume"].iloc[second_pos - 5 : second_pos + 5].mean()
+        if first_pos > DOUBLE_BOTTOM_VOLUME_WINDOW and second_pos > DOUBLE_BOTTOM_VOLUME_WINDOW:
+            vol_around_first = df["Volume"].iloc[first_pos - DOUBLE_BOTTOM_VOLUME_WINDOW : first_pos + DOUBLE_BOTTOM_VOLUME_WINDOW].mean()
+            vol_around_second = df["Volume"].iloc[second_pos - DOUBLE_BOTTOM_VOLUME_WINDOW : second_pos + DOUBLE_BOTTOM_VOLUME_WINDOW].mean()
             if vol_around_first > 0:
                 volume_confirm = vol_around_second < vol_around_first
 
@@ -389,17 +468,17 @@ class PatternDetector:
         Returns:
             Pattern dict with details, or None if no pattern found.
         """
-        if len(df) < 200:
+        if len(df) < MIN_DATA_POINTS:
             return None
 
         closes = df["Close"]
 
         # Scan last 65 weeks (~325 trading days) for cup formation
-        max_lookback = min(325, len(df) - 50)
+        max_lookback = min(CUP_MAX_LOOKBACK_DAYS, len(df) - CUP_LOOKBACK_BUFFER)
         recent = closes.iloc[-max_lookback:]
 
         # Find the cup's left lip (highest point before decline)
-        peaks = self.find_local_peaks(recent, window=15)
+        peaks = self.find_local_peaks(recent, window=CUP_PEAK_WINDOW)
         if not peaks:
             return None
 
@@ -409,7 +488,7 @@ class PatternDetector:
             left_lip_pos = peak_idx
 
             # Need at least 35 days after left lip for cup + handle
-            if len(recent) - left_lip_pos < 35:
+            if len(recent) - left_lip_pos < CUP_MIN_AFTER_LIP:
                 continue
 
             # Check prior uptrend before the left lip
@@ -426,12 +505,12 @@ class PatternDetector:
 
             # Cup depth check
             depth = (left_lip - cup_low) / left_lip * 100
-            if depth < 12.0 or depth > 50.0:
+            if depth < CUP_MIN_DEPTH_PCT or depth > CUP_MAX_DEPTH_PCT:
                 continue
 
             # The cup low should be roughly in the middle, not at the very end
             after_low = after_lip.iloc[cup_low_pos:]
-            if len(after_low) < 15:
+            if len(after_low) < CUP_MIN_AFTER_LOW:
                 continue
 
             # Right side should recover close to left lip level
@@ -439,14 +518,14 @@ class PatternDetector:
             right_high_pos = int(after_low.values.argmax())
             recovery_pct = (right_high - cup_low) / (left_lip - cup_low) * 100
 
-            if recovery_pct < 70:
+            if recovery_pct < CUP_MIN_RECOVERY_PCT:
                 continue  # Right side hasn't recovered enough
 
             # Look for handle: small pullback after right side recovery
             after_right_high = after_low.iloc[right_high_pos:]
-            if len(after_right_high) < 5:
+            if len(after_right_high) < CUP_MIN_HANDLE_DAYS:
                 # No handle yet, but cup is forming
-                handle_low = float(after_low.iloc[-5:].min()) if len(after_low) >= 5 else cup_low
+                handle_low = float(after_low.iloc[-CUP_MIN_HANDLE_DAYS:].min()) if len(after_low) >= CUP_MIN_HANDLE_DAYS else cup_low
                 handle_decline = (right_high - handle_low) / right_high * 100
             else:
                 handle_low = float(after_right_high.min())
@@ -454,28 +533,28 @@ class PatternDetector:
                 handle_length_days = len(after_right_high)
                 handle_length_weeks = handle_length_days / 5
 
-                if handle_length_weeks > 6:
+                if handle_length_weeks > HANDLE_MAX_LENGTH_WEEKS:
                     continue  # Handle too long
-                if handle_decline > 15:
+                if handle_decline > HANDLE_MAX_DECLINE_PCT:
                     continue  # Handle too deep
 
             # Total base length
             total_days = len(after_lip)
             total_weeks = total_days / 5
-            if total_weeks < 7 or total_weeks > 65:
+            if total_weeks < CUP_MIN_TOTAL_WEEKS or total_weeks > CUP_MAX_TOTAL_WEEKS:
                 continue
 
             # Classify as regular or deep
-            pattern_type = "Deep Cup & Handle" if depth > 33 else "Cup & Handle"
+            pattern_type = "Deep Cup & Handle" if depth > CUP_DEEP_THRESHOLD_PCT else "Cup & Handle"
 
             # Volume confirmation: declining volume in handle
             volume_confirm = False
-            if "AvgVolume50" in df.columns and len(after_right_high) >= 5:
+            if "AvgVolume50" in df.columns and len(after_right_high) >= CUP_MIN_HANDLE_DAYS:
                 abs_right_high_pos = len(df) - len(after_right_high)
                 handle_vol = df["Volume"].iloc[abs_right_high_pos:].mean()
                 cup_vol = df["Volume"].iloc[abs_pos:abs_right_high_pos].mean()
                 if cup_vol > 0:
-                    volume_confirm = handle_vol < cup_vol * 0.85
+                    volume_confirm = handle_vol < cup_vol * CUP_HANDLE_VOLUME_FACTOR
 
             buy_point = round(right_high, 2)
             current_price = round(float(closes.iloc[-1]), 2)
@@ -517,27 +596,27 @@ class PatternDetector:
 
         # 1. Depth score (20 pts) — ideal ranges by pattern type
         if pattern_type == "Flat Base":
-            if 5 <= depth <= 12:
-                score += 20
-            elif depth < 5:
+            if FLAT_BASE_IDEAL_DEPTH_LOW <= depth <= FLAT_BASE_IDEAL_DEPTH_HIGH:
+                score += SCORE_DEPTH_MAX
+            elif depth < FLAT_BASE_IDEAL_DEPTH_LOW:
                 score += 10
             else:
-                score += max(0, 20 - (depth - 12) * 2)
+                score += max(0, SCORE_DEPTH_MAX - (depth - FLAT_BASE_IDEAL_DEPTH_HIGH) * FLAT_BASE_DEPTH_PENALTY)
         elif pattern_type == "Double Bottom":
-            if 20 <= depth <= 30:
-                score += 20
+            if DOUBLE_BOTTOM_IDEAL_DEPTH_LOW <= depth <= DOUBLE_BOTTOM_IDEAL_DEPTH_HIGH:
+                score += SCORE_DEPTH_MAX
             else:
-                score += max(0, 20 - abs(depth - 25) * 1.5)
+                score += max(0, SCORE_DEPTH_MAX - abs(depth - DOUBLE_BOTTOM_DEPTH_CENTER) * DOUBLE_BOTTOM_DEPTH_PENALTY)
         elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
             if pattern_type == "Deep Cup & Handle":
-                ideal_center = 37
+                ideal_center = CUP_DEEP_IDEAL_DEPTH_CENTER
             else:
-                ideal_center = 20
-            score += max(0, 20 - abs(depth - ideal_center) * 1.0)
+                ideal_center = CUP_IDEAL_DEPTH_CENTER
+            score += max(0, SCORE_DEPTH_MAX - abs(depth - ideal_center) * CUP_DEPTH_PENALTY)
 
         # 2. Volume confirmation (15 pts)
         if pattern.get("volume_confirmation"):
-            score += 15
+            score += SCORE_VOLUME_MAX
 
         # 3. Price above 50-day MA (15 pts)
         current_close = df["Close"].iloc[-1]
@@ -545,47 +624,47 @@ class PatternDetector:
         above_200 = False
         if "MA50" in df.columns and pd.notna(df["MA50"].iloc[-1]):
             if current_close > df["MA50"].iloc[-1]:
-                score += 15
+                score += SCORE_ABOVE_50MA_MAX
                 above_50 = True
 
         # 4. Price above 200-day MA (10 pts)
         if "MA200" in df.columns and pd.notna(df["MA200"].iloc[-1]):
             if current_close > df["MA200"].iloc[-1]:
-                score += 10
+                score += SCORE_ABOVE_200MA_MAX
                 above_200 = True
 
         # 5. Consolidation tightness (15 pts)
-        last_25 = df["Close"].iloc[-25:]
-        if len(last_25) >= 25:
+        last_25 = df["Close"].iloc[-TIGHTNESS_LOOKBACK:]
+        if len(last_25) >= TIGHTNESS_LOOKBACK:
             weekly_range = (last_25.max() - last_25.min()) / last_25.mean() * 100
-            if weekly_range < 8:
-                score += 15
-            elif weekly_range < 12:
+            if weekly_range < TIGHTNESS_TIGHT:
+                score += SCORE_TIGHTNESS_MAX
+            elif weekly_range < TIGHTNESS_MODERATE:
                 score += 10
-            elif weekly_range < 18:
+            elif weekly_range < TIGHTNESS_LOOSE:
                 score += 5
 
         # 6. Base length (10 pts)
         if pattern_type == "Flat Base":
-            ideal_weeks = (6, 12)
+            ideal_weeks = FLAT_BASE_IDEAL_WEEKS
         elif pattern_type == "Double Bottom":
-            ideal_weeks = (7, 20)
+            ideal_weeks = DOUBLE_BOTTOM_IDEAL_WEEKS
         else:
-            ideal_weeks = (8, 30)
+            ideal_weeks = CUP_IDEAL_WEEKS
 
         if ideal_weeks[0] <= length_weeks <= ideal_weeks[1]:
-            score += 10
+            score += SCORE_BASE_LENGTH_MAX
         elif length_weeks < ideal_weeks[0]:
             score += 5
         else:
-            score += max(0, 10 - (length_weeks - ideal_weeks[1]) * 0.5)
+            score += max(0, SCORE_BASE_LENGTH_MAX - (length_weeks - ideal_weeks[1]) * BASE_LENGTH_OVER_PENALTY)
 
         # 7. Pattern-specific bonuses (15 pts)
         if pattern_type == "Double Bottom":
             low_diff = pattern.get("low_diff_pct", 10)
-            if low_diff <= 3:
+            if low_diff <= DOUBLE_BOTTOM_TIGHT_LOW_DIFF:
                 score += 10
-            elif low_diff <= 5:
+            elif low_diff <= DOUBLE_BOTTOM_MODERATE_LOW_DIFF:
                 score += 5
             first = pattern.get("first_low", 0)
             second = pattern.get("second_low", 0)
@@ -594,21 +673,21 @@ class PatternDetector:
 
         elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
             recovery = pattern.get("recovery_pct", 0)
-            if recovery >= 90:
+            if recovery >= CUP_HIGH_RECOVERY_PCT:
                 score += 10
-            elif recovery >= 80:
+            elif recovery >= CUP_MODERATE_RECOVERY_PCT:
                 score += 5
             handle_low = pattern.get("handle_low", 0)
             right_high = pattern.get("right_high", 1)
             if right_high > 0:
                 handle_depth = (right_high - handle_low) / right_high * 100
-                if handle_depth < 8:
+                if handle_depth < CUP_TIGHT_HANDLE_DEPTH_PCT:
                     score += 5
 
         elif pattern_type == "Flat Base":
             if above_50 and above_200:
                 score += 10
-            if depth < 10:
+            if depth < FLAT_BASE_TIGHT_DEPTH_PCT:
                 score += 5
 
         return round(min(100, max(0, score)), 1)
@@ -617,7 +696,7 @@ class PatternDetector:
 class StockScanner:
     """Scans a list of tickers for base patterns using concurrent fetching."""
 
-    def __init__(self, tickers: list[str], max_workers: int = 5):
+    def __init__(self, tickers: list[str], max_workers: int = DEFAULT_MAX_WORKERS):
         self.tickers = tickers
         self.max_workers = max_workers
         self.detector = PatternDetector()
@@ -626,8 +705,8 @@ class StockScanner:
         """Fetch 2 years of historical data for a ticker."""
         try:
             t = yf.Ticker(ticker)
-            df = t.history(period="2y")
-            if df is None or len(df) < 200:
+            df = t.history(period=DEFAULT_HISTORY_PERIOD)
+            if df is None or len(df) < MIN_DATA_POINTS:
                 return None
             return df
         except Exception as e:
@@ -706,7 +785,7 @@ class StockScanner:
         spy_df = self._fetch_data("SPY")
         if spy_df is None:
             logger.error("Failed to fetch SPY data. RS ratings will be inaccurate.")
-            spy_df = pd.DataFrame({"Close": [100] * 252, "Volume": [1] * 252})
+            spy_df = pd.DataFrame({"Close": [100] * TRADING_DAYS_PER_YEAR, "Volume": [1] * TRADING_DAYS_PER_YEAR})
 
         all_results: list[PatternResult] = []
         total = len(self.tickers)

@@ -2,13 +2,11 @@
 import os
 import tempfile
 
-# Use a temp database for tests
-os.environ["SCANNER_DB_PATH"] = os.path.join(tempfile.gettempdir(), "test_scanner_app.db")
+_test_db_dir = tempfile.mkdtemp()
+os.environ["SCANNER_DB_PATH"] = os.path.join(_test_db_dir, "test_scanner_app.db")
 
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app import app
-
 
 client = TestClient(app)
 
@@ -39,6 +37,5 @@ def test_start_scan():
 
 
 def test_get_results_pending():
-    """Results for a non-existent scan return empty."""
     response = client.get("/api/scan/nonexistent/results")
     assert response.status_code == 200

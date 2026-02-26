@@ -68,21 +68,6 @@ def test_pattern_result_status_extended():
     assert result.status == "Extended"
 
 
-def _make_price_df(closes: list[float], volumes: list[float] | None = None) -> pd.DataFrame:
-    """Helper to create a minimal DataFrame for testing."""
-    n = len(closes)
-    if volumes is None:
-        volumes = [1_000_000] * n
-    dates = pd.bdate_range(end="2026-02-20", periods=n)
-    return pd.DataFrame({
-        "Open": closes,
-        "High": [c * 1.01 for c in closes],
-        "Low": [c * 0.99 for c in closes],
-        "Close": closes,
-        "Volume": volumes,
-    }, index=dates)
-
-
 def test_find_local_peaks():
     prices = [10, 11, 12, 13, 14, 15, 14, 13, 12, 11, 10]
     closes = pd.Series(prices)
@@ -99,9 +84,9 @@ def test_find_local_troughs():
     assert 5 in troughs
 
 
-def test_add_moving_averages():
+def test_add_moving_averages(make_price_df):
     closes = list(range(100, 300))  # 200 data points
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     detector = PatternDetector()
     result = detector.add_moving_averages(df)
     assert "MA10" in result.columns
@@ -112,19 +97,19 @@ def test_add_moving_averages():
     assert pd.notna(result["MA200"].iloc[-1])
 
 
-def test_calculate_relative_strength():
+def test_calculate_relative_strength(make_price_df):
     """Stock that doubled while SPY gained 10% should have high RS."""
     detector = PatternDetector()
     n = 252
     stock_closes = [100 + (100 * i / n) for i in range(n)]
     spy_closes = [400 + (40 * i / n) for i in range(n)]
-    stock_df = _make_price_df(stock_closes)
-    spy_df = _make_price_df(spy_closes)
+    stock_df = make_price_df(stock_closes)
+    spy_df = make_price_df(spy_closes)
     rs = detector.calculate_relative_strength(stock_df, spy_df)
     assert rs > 80
 
 
-def test_detect_flat_base_valid():
+def test_detect_flat_base_valid(make_price_df):
     """Tight consolidation <15% range after 30%+ uptrend."""
     detector = PatternDetector()
     # 30 days flat preamble + 140 day uptrend (100 -> 140, 40% gain) + 40 days flat = 210 total
@@ -137,7 +122,7 @@ def test_detect_flat_base_valid():
     flat_start = len(preamble) + len(uptrend)
     for i in range(flat_start, len(closes)):
         volumes[i] = 600_000
-    df = _make_price_df(closes, volumes)
+    df = make_price_df(closes, volumes)
     df = detector.add_moving_averages(df)
     result = detector.detect_flat_base(df)
     assert result is not None
@@ -146,7 +131,7 @@ def test_detect_flat_base_valid():
     assert result["base_length_weeks"] >= 5
 
 
-def test_detect_flat_base_too_deep():
+def test_detect_flat_base_too_deep(make_price_df):
     """Consolidation >15% should NOT be flat base."""
     detector = PatternDetector()
     preamble = [100.0] * 30
@@ -154,26 +139,26 @@ def test_detect_flat_base_too_deep():
     # 20%+ range consolidation — too deep for flat base
     deep_consol = [150 - (30 * i / 40) + (15 * (i % 2)) for i in range(40)]
     closes = preamble + uptrend + deep_consol
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
     result = detector.detect_flat_base(df)
     assert result is None
 
 
-def test_detect_flat_base_no_prior_uptrend():
+def test_detect_flat_base_no_prior_uptrend(make_price_df):
     """Flat consolidation without 30%+ prior uptrend should NOT match."""
     detector = PatternDetector()
     preamble = [100.0] * 30
     uptrend = [100 + (10 * i / 140) for i in range(140)]
     flat = [110 + 2 * np.sin(i * 0.3) for i in range(40)]
     closes = preamble + uptrend + flat
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
     result = detector.detect_flat_base(df)
     assert result is None
 
 
-def test_detect_double_bottom_valid():
+def test_detect_double_bottom_valid(make_price_df):
     """W-pattern with two lows within 3-5% of each other."""
     detector = PatternDetector()
 
@@ -185,7 +170,7 @@ def test_detect_double_bottom_valid():
     recovery = [119 + (14 * i / 30) for i in range(30)]        # 119 -> 133
 
     closes = uptrend + decline1 + bounce + decline2 + recovery
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
 
     result = detector.detect_double_bottom(df)
@@ -193,7 +178,7 @@ def test_detect_double_bottom_valid():
     assert result["pattern_type"] == "Double Bottom"
 
 
-def test_detect_double_bottom_lows_too_far_apart():
+def test_detect_double_bottom_lows_too_far_apart(make_price_df):
     """Two lows more than 5% apart should NOT match."""
     detector = PatternDetector()
 
@@ -204,14 +189,14 @@ def test_detect_double_bottom_lows_too_far_apart():
     recovery = [100 + (14 * i / 30) for i in range(30)]
 
     closes = uptrend + decline1 + bounce + decline2 + recovery
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
 
     result = detector.detect_double_bottom(df)
     assert result is None
 
 
-def test_detect_cup_and_handle_valid():
+def test_detect_cup_and_handle_valid(make_price_df):
     """U-shaped cup (12-33% depth) with small handle."""
     detector = PatternDetector()
 
@@ -233,7 +218,7 @@ def test_detect_cup_and_handle_valid():
     for i in range(handle_start, len(closes)):
         volumes[i] = 500_000
 
-    df = _make_price_df(closes, volumes)
+    df = make_price_df(closes, volumes)
     df = detector.add_moving_averages(df)
 
     result = detector.detect_cup_and_handle(df)
@@ -242,7 +227,7 @@ def test_detect_cup_and_handle_valid():
     assert 12 <= result["base_depth"] <= 33
 
 
-def test_detect_cup_and_handle_deep():
+def test_detect_cup_and_handle_deep(make_price_df):
     """Cup with 33-50% depth should be classified as Deep Cup & Handle."""
     detector = PatternDetector()
 
@@ -253,7 +238,7 @@ def test_detect_cup_and_handle_deep():
     handle = [156 - (8 * i / 10) for i in range(10)] + [148 + (6 * i / 10) for i in range(10)]
 
     closes = uptrend + left_side + bottom + right_side + handle
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
 
     result = detector.detect_cup_and_handle(df)
@@ -261,7 +246,7 @@ def test_detect_cup_and_handle_deep():
     assert result["pattern_type"] == "Deep Cup & Handle"
 
 
-def test_detect_cup_and_handle_too_shallow():
+def test_detect_cup_and_handle_too_shallow(make_price_df):
     """Cup with <12% depth should NOT match."""
     detector = PatternDetector()
 
@@ -273,14 +258,14 @@ def test_detect_cup_and_handle_too_shallow():
     handle = [148 - (3 * i / 10) for i in range(10)] + [145 + (2 * i / 10) for i in range(10)]
 
     closes = uptrend + left_side + bottom + right_side + handle
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
 
     result = detector.detect_cup_and_handle(df)
     assert result is None
 
 
-def test_confidence_score_high_quality():
+def test_confidence_score_high_quality(make_price_df):
     """Pattern with all positive signals should score 60+."""
     detector = PatternDetector()
     pattern = {
@@ -289,13 +274,13 @@ def test_confidence_score_high_quality():
         "volume_confirmation": True,
         "base_length_weeks": 7,
     }
-    df = _make_price_df(list(range(100, 300)))
+    df = make_price_df(list(range(100, 300)))
     df = detector.add_moving_averages(df)
     score = detector.calculate_confidence(pattern, df)
     assert score >= 60
 
 
-def test_confidence_score_low_quality():
+def test_confidence_score_low_quality(make_price_df):
     """Pattern with negative signals should score below 60."""
     detector = PatternDetector()
     pattern = {
@@ -306,7 +291,7 @@ def test_confidence_score_low_quality():
     }
     # Declining prices — below MAs
     closes = [200 - i * 0.5 for i in range(200)]
-    df = _make_price_df(closes)
+    df = make_price_df(closes)
     df = detector.add_moving_averages(df)
     score = detector.calculate_confidence(pattern, df)
     assert score < 60

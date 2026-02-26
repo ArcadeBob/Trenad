@@ -10,7 +10,24 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Optional
 
+import numpy as np
+
 from pattern_scanner import PatternResult
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """Handle numpy types when serializing pattern details to JSON."""
+
+    def default(self, obj):
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 
 class ScanDatabase:
@@ -122,7 +139,7 @@ class ScanDatabase:
                         r.base_depth, r.base_length_weeks,
                         int(r.volume_confirmation), int(r.above_50ma),
                         int(r.above_200ma), r.rs_rating,
-                        json.dumps(r.pattern_details),
+                        json.dumps(r.pattern_details, cls=_NumpyEncoder),
                     ),
                 )
 

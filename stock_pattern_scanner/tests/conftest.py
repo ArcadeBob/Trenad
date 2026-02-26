@@ -24,6 +24,12 @@ _PATTERN_RESULT_DEFAULTS = dict(
     above_200ma=True,
     rs_rating=85.0,
     pattern_details={},
+    stop_loss_price=139.5,
+    profit_target_price=180.0,
+    breakout_confirmed=None,
+    volume_surge_pct=None,
+    volume_rating="C",
+    trend_score=0.0,
 )
 
 

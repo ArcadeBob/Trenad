@@ -79,6 +79,12 @@ class ScanDatabase:
                     above_200ma INTEGER,
                     rs_rating REAL,
                     pattern_details TEXT,
+                    stop_loss_price REAL DEFAULT 0,
+                    profit_target_price REAL DEFAULT 0,
+                    breakout_confirmed INTEGER DEFAULT NULL,
+                    volume_surge_pct REAL DEFAULT NULL,
+                    volume_rating TEXT DEFAULT 'C',
+                    trend_score REAL DEFAULT 0,
                     FOREIGN KEY (scan_id) REFERENCES scans(scan_id)
                 );
             """)
@@ -131,8 +137,10 @@ class ScanDatabase:
                     """INSERT INTO results
                        (scan_id, ticker, pattern_type, confidence_score, buy_point,
                         current_price, distance_to_pivot, base_depth, base_length_weeks,
-                        volume_confirmation, above_50ma, above_200ma, rs_rating, pattern_details)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        volume_confirmation, above_50ma, above_200ma, rs_rating, pattern_details,
+                        stop_loss_price, profit_target_price, breakout_confirmed, volume_surge_pct,
+                        volume_rating, trend_score)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         scan_id, r.ticker, r.pattern_type, r.confidence_score,
                         r.buy_point, r.current_price, r.distance_to_pivot,
@@ -140,6 +148,9 @@ class ScanDatabase:
                         int(r.volume_confirmation), int(r.above_50ma),
                         int(r.above_200ma), r.rs_rating,
                         json.dumps(r.pattern_details, cls=_NumpyEncoder),
+                        r.stop_loss_price, r.profit_target_price,
+                        None if r.breakout_confirmed is None else int(r.breakout_confirmed),
+                        r.volume_surge_pct, r.volume_rating, r.trend_score,
                     ),
                 )
 
@@ -150,8 +161,11 @@ class ScanDatabase:
                 (scan_id,),
             ).fetchall()
 
-        return [
-            PatternResult(
+        results = []
+        for row in rows:
+            bc_raw = row["breakout_confirmed"]
+            bc = None if bc_raw is None else bool(bc_raw)
+            results.append(PatternResult(
                 ticker=row["ticker"],
                 pattern_type=row["pattern_type"],
                 confidence_score=row["confidence_score"],
@@ -165,6 +179,11 @@ class ScanDatabase:
                 above_200ma=bool(row["above_200ma"]),
                 rs_rating=row["rs_rating"],
                 pattern_details=json.loads(row["pattern_details"]),
-            )
-            for row in rows
-        ]
+                stop_loss_price=row["stop_loss_price"] or 0.0,
+                profit_target_price=row["profit_target_price"] or 0.0,
+                breakout_confirmed=bc,
+                volume_surge_pct=row["volume_surge_pct"],
+                volume_rating=row["volume_rating"] or "C",
+                trend_score=row["trend_score"] or 0.0,
+            ))
+        return results

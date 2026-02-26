@@ -266,7 +266,7 @@ def test_detect_cup_and_handle_too_shallow(make_price_df):
 
 
 def test_confidence_score_high_quality(make_price_df):
-    """Pattern with all positive signals should score 60+."""
+    """Pattern with all positive signals should score 40+ (without external module scores)."""
     detector = PatternDetector()
     pattern = {
         "pattern_type": "Flat Base",
@@ -277,7 +277,7 @@ def test_confidence_score_high_quality(make_price_df):
     df = make_price_df(list(range(100, 300)))
     df = detector.add_moving_averages(df)
     score = detector.calculate_confidence(pattern, df)
-    assert score >= 60
+    assert score >= 40
 
 
 def test_confidence_score_low_quality(make_price_df):

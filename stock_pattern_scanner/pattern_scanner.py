@@ -12,6 +12,7 @@ import pandas as pd
 import yfinance as yf
 from scipy.signal import argrelextrema
 
+from breakout_rules import BreakoutAnalyzer
 from constants import (
     BASE_LENGTH_OVER_PENALTY,
     CUP_DEEP_IDEAL_DEPTH_CENTER,
@@ -73,14 +74,27 @@ from constants import (
     RS_BASELINE,
     RS_MAX,
     RS_MIN,
+    RS_MODERATE,
     RS_PERIODS,
+    RS_STRONG,
     RS_WEIGHTS,
     SCORE_ABOVE_200MA_MAX,
+    SCORE_ABOVE_200MA_MAX_V2,
     SCORE_ABOVE_50MA_MAX,
+    SCORE_ABOVE_50MA_MAX_V2,
     SCORE_BASE_LENGTH_MAX,
+    SCORE_BASE_LENGTH_MAX_V2,
+    SCORE_BREAKOUT_QUALITY_MAX,
     SCORE_DEPTH_MAX,
+    SCORE_DEPTH_MAX_V2,
+    SCORE_MINIMUM_VIABLE,
+    SCORE_PATTERN_BONUS_MAX_V2,
+    SCORE_RS_RATING_MAX,
     SCORE_TIGHTNESS_MAX,
+    SCORE_TIGHTNESS_MAX_V2,
+    SCORE_TREND_STRENGTH_MAX,
     SCORE_VOLUME_MAX,
+    SCORE_VOLUME_PROFILE_MAX,
     STATUS_AT_PIVOT_THRESHOLD,
     STATUS_EXTENDED_THRESHOLD,
     STATUS_NEAR_PIVOT_LOWER,
@@ -90,6 +104,9 @@ from constants import (
     TIGHTNESS_TIGHT,
     TRADING_DAYS_PER_YEAR,
 )
+from market_regime import MarketRegime
+from trend_strength import TrendAnalyzer
+from volume_analysis import VolumeAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -111,13 +128,20 @@ class PatternResult:
     above_200ma: bool
     rs_rating: float
     pattern_details: Dict = field(default_factory=dict)
+    stop_loss_price: float = 0.0
+    profit_target_price: float = 0.0
+    breakout_confirmed: Optional[bool] = None
+    volume_surge_pct: Optional[float] = None
+    volume_rating: str = "C"
+    trend_score: float = 0.0
 
     @property
     def status(self) -> str:
-        """Determine status based on distance to pivot (buy point).
-
-        Returns one of: 'At Pivot', 'Near Pivot', 'Building', 'Extended'
-        """
+        """Determine status based on distance to pivot and breakout confirmation."""
+        if self.breakout_confirmed is True:
+            return "Breakout Confirmed"
+        if self.breakout_confirmed is False and self.distance_to_pivot >= 0:
+            return "Failed Breakout"
         if self.distance_to_pivot > STATUS_EXTENDED_THRESHOLD:
             return "Extended"
         elif abs(self.distance_to_pivot) <= STATUS_AT_PIVOT_THRESHOLD:
@@ -577,74 +601,79 @@ class PatternDetector:
 
         return None
 
-    def calculate_confidence(self, pattern: dict, df: pd.DataFrame) -> float:
-        """Calculate confidence score (0-100) for a detected pattern.
+    def calculate_confidence(
+        self, pattern: dict, df: pd.DataFrame,
+        volume_score: float = 0.0,
+        trend_score: float = 0.0,
+        rs_rating: float = 0.0,
+        breakout_score: float = 0.0,
+    ) -> float:
+        """Calculate confidence score (0-100) using revised institutional scoring.
 
-        Scoring factors:
-        - Ideal depth range (20pts)
-        - Volume confirmation (15pts)
-        - Price above 50-day MA (15pts)
-        - Price above 200-day MA (10pts)
-        - Consolidation tightness (15pts)
-        - Base length in ideal range (10pts)
-        - Pattern-specific bonuses (15pts)
+        New scoring model (100 pts):
+        - Base depth: 15 pts
+        - Volume profile: 20 pts (from VolumeAnalyzer)
+        - Above 50-day MA: 10 pts
+        - Above 200-day MA: 5 pts
+        - Tightness: 10 pts
+        - Base length: 5 pts
+        - Pattern bonuses: 10 pts
+        - Trend strength: 10 pts (from TrendAnalyzer)
+        - RS rating: 10 pts
+        - Breakout quality: 5 pts (from BreakoutAnalyzer)
         """
         score = 0.0
         pattern_type = pattern["pattern_type"]
         depth = pattern.get("base_depth", 0)
         length_weeks = pattern.get("base_length_weeks", 0)
 
-        # 1. Depth score (20 pts) — ideal ranges by pattern type
+        # 1. Depth score (15 pts)
         if pattern_type == "Flat Base":
             if FLAT_BASE_IDEAL_DEPTH_LOW <= depth <= FLAT_BASE_IDEAL_DEPTH_HIGH:
-                score += SCORE_DEPTH_MAX
+                score += SCORE_DEPTH_MAX_V2
             elif depth < FLAT_BASE_IDEAL_DEPTH_LOW:
-                score += 10
+                score += 8
             else:
-                score += max(0, SCORE_DEPTH_MAX - (depth - FLAT_BASE_IDEAL_DEPTH_HIGH) * FLAT_BASE_DEPTH_PENALTY)
+                score += max(0, SCORE_DEPTH_MAX_V2 - (depth - FLAT_BASE_IDEAL_DEPTH_HIGH) * FLAT_BASE_DEPTH_PENALTY)
         elif pattern_type == "Double Bottom":
             if DOUBLE_BOTTOM_IDEAL_DEPTH_LOW <= depth <= DOUBLE_BOTTOM_IDEAL_DEPTH_HIGH:
-                score += SCORE_DEPTH_MAX
+                score += SCORE_DEPTH_MAX_V2
             else:
-                score += max(0, SCORE_DEPTH_MAX - abs(depth - DOUBLE_BOTTOM_DEPTH_CENTER) * DOUBLE_BOTTOM_DEPTH_PENALTY)
+                score += max(0, SCORE_DEPTH_MAX_V2 - abs(depth - DOUBLE_BOTTOM_DEPTH_CENTER) * DOUBLE_BOTTOM_DEPTH_PENALTY)
         elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
-            if pattern_type == "Deep Cup & Handle":
-                ideal_center = CUP_DEEP_IDEAL_DEPTH_CENTER
-            else:
-                ideal_center = CUP_IDEAL_DEPTH_CENTER
-            score += max(0, SCORE_DEPTH_MAX - abs(depth - ideal_center) * CUP_DEPTH_PENALTY)
+            ideal = CUP_DEEP_IDEAL_DEPTH_CENTER if pattern_type == "Deep Cup & Handle" else CUP_IDEAL_DEPTH_CENTER
+            score += max(0, SCORE_DEPTH_MAX_V2 - abs(depth - ideal) * CUP_DEPTH_PENALTY)
 
-        # 2. Volume confirmation (15 pts)
-        if pattern.get("volume_confirmation"):
-            score += SCORE_VOLUME_MAX
+        # 2. Volume profile (20 pts — passed in from VolumeAnalyzer)
+        score += volume_score
 
-        # 3. Price above 50-day MA (15 pts)
+        # 3. Price above 50-day MA (10 pts)
         current_close = df["Close"].iloc[-1]
         above_50 = False
         above_200 = False
         if "MA50" in df.columns and pd.notna(df["MA50"].iloc[-1]):
             if current_close > df["MA50"].iloc[-1]:
-                score += SCORE_ABOVE_50MA_MAX
+                score += SCORE_ABOVE_50MA_MAX_V2
                 above_50 = True
 
-        # 4. Price above 200-day MA (10 pts)
+        # 4. Price above 200-day MA (5 pts)
         if "MA200" in df.columns and pd.notna(df["MA200"].iloc[-1]):
             if current_close > df["MA200"].iloc[-1]:
-                score += SCORE_ABOVE_200MA_MAX
+                score += SCORE_ABOVE_200MA_MAX_V2
                 above_200 = True
 
-        # 5. Consolidation tightness (15 pts)
+        # 5. Consolidation tightness (10 pts)
         last_25 = df["Close"].iloc[-TIGHTNESS_LOOKBACK:]
         if len(last_25) >= TIGHTNESS_LOOKBACK:
             weekly_range = (last_25.max() - last_25.min()) / last_25.mean() * 100
             if weekly_range < TIGHTNESS_TIGHT:
-                score += SCORE_TIGHTNESS_MAX
+                score += SCORE_TIGHTNESS_MAX_V2
             elif weekly_range < TIGHTNESS_MODERATE:
-                score += 10
+                score += 7
             elif weekly_range < TIGHTNESS_LOOSE:
-                score += 5
+                score += 3
 
-        # 6. Base length (10 pts)
+        # 6. Base length (5 pts)
         if pattern_type == "Flat Base":
             ideal_weeks = FLAT_BASE_IDEAL_WEEKS
         elif pattern_type == "Double Bottom":
@@ -653,42 +682,50 @@ class PatternDetector:
             ideal_weeks = CUP_IDEAL_WEEKS
 
         if ideal_weeks[0] <= length_weeks <= ideal_weeks[1]:
-            score += SCORE_BASE_LENGTH_MAX
+            score += SCORE_BASE_LENGTH_MAX_V2
         elif length_weeks < ideal_weeks[0]:
-            score += 5
+            score += 3
         else:
-            score += max(0, SCORE_BASE_LENGTH_MAX - (length_weeks - ideal_weeks[1]) * BASE_LENGTH_OVER_PENALTY)
+            score += max(0, SCORE_BASE_LENGTH_MAX_V2 - (length_weeks - ideal_weeks[1]) * BASE_LENGTH_OVER_PENALTY)
 
-        # 7. Pattern-specific bonuses (15 pts)
+        # 7. Pattern-specific bonuses (10 pts)
         if pattern_type == "Double Bottom":
             low_diff = pattern.get("low_diff_pct", 10)
             if low_diff <= DOUBLE_BOTTOM_TIGHT_LOW_DIFF:
-                score += 10
+                score += 7
             elif low_diff <= DOUBLE_BOTTOM_MODERATE_LOW_DIFF:
-                score += 5
-            first = pattern.get("first_low", 0)
-            second = pattern.get("second_low", 0)
-            if second < first:
-                score += 5
-
+                score += 4
+            if pattern.get("second_low", 0) < pattern.get("first_low", 0):
+                score += 3
         elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
             recovery = pattern.get("recovery_pct", 0)
             if recovery >= CUP_HIGH_RECOVERY_PCT:
-                score += 10
+                score += 7
             elif recovery >= CUP_MODERATE_RECOVERY_PCT:
-                score += 5
+                score += 4
             handle_low = pattern.get("handle_low", 0)
             right_high = pattern.get("right_high", 1)
             if right_high > 0:
                 handle_depth = (right_high - handle_low) / right_high * 100
                 if handle_depth < CUP_TIGHT_HANDLE_DEPTH_PCT:
-                    score += 5
-
+                    score += 3
         elif pattern_type == "Flat Base":
             if above_50 and above_200:
-                score += 10
+                score += 7
             if depth < FLAT_BASE_TIGHT_DEPTH_PCT:
-                score += 5
+                score += 3
+
+        # 8. Trend strength (10 pts — passed in from TrendAnalyzer)
+        score += trend_score
+
+        # 9. RS rating (10 pts)
+        if rs_rating >= RS_STRONG:
+            score += SCORE_RS_RATING_MAX
+        elif rs_rating >= RS_MODERATE:
+            score += 5
+
+        # 10. Breakout quality (5 pts — passed in from BreakoutAnalyzer)
+        score += breakout_score
 
         return round(min(100, max(0, score)), 1)
 
@@ -723,6 +760,13 @@ class StockScanner:
 
         df = self.detector.add_moving_averages(df)
 
+        # Trend strength analysis
+        trend_analyzer = TrendAnalyzer(df)
+        if trend_analyzer.is_too_volatile():
+            return []  # ATR ratio > 5%, skip
+
+        trend_score = trend_analyzer.score()
+
         results = []
         current_price = round(float(df["Close"].iloc[-1]), 2)
         above_50 = bool(
@@ -746,24 +790,58 @@ class StockScanner:
         for detect_fn in detectors:
             try:
                 pattern = detect_fn(df)
-                if pattern is not None:
-                    confidence = self.detector.calculate_confidence(pattern, df)
-                    result = PatternResult(
-                        ticker=ticker,
-                        pattern_type=pattern["pattern_type"],
-                        confidence_score=confidence,
-                        buy_point=pattern["buy_point"],
-                        current_price=pattern["current_price"],
-                        distance_to_pivot=pattern["distance_to_pivot"],
-                        base_depth=pattern["base_depth"],
-                        base_length_weeks=pattern["base_length_weeks"],
-                        volume_confirmation=pattern["volume_confirmation"],
-                        above_50ma=above_50,
-                        above_200ma=above_200,
-                        rs_rating=rs_rating,
-                        pattern_details=pattern,
-                    )
-                    results.append(result)
+                if pattern is None:
+                    continue
+
+                # Volume analysis over the base period
+                base_start = pattern.get("base_start_idx", len(df) - pattern.get("base_length_weeks", 5) * 5)
+                base_end = len(df) - 1
+                vol_analyzer = VolumeAnalyzer(df, base_start, base_end)
+
+                if vol_analyzer.is_distributing():
+                    continue  # D/E volume rating, skip
+
+                volume_score = vol_analyzer.score()
+                volume_rating = vol_analyzer.ad_rating()
+
+                # Breakout analysis
+                breakout_analyzer = BreakoutAnalyzer(df, pattern["buy_point"])
+                breakout_result = breakout_analyzer.evaluate()
+                breakout_score = breakout_analyzer.score()
+
+                confidence = self.detector.calculate_confidence(
+                    pattern, df,
+                    volume_score=volume_score,
+                    trend_score=trend_score,
+                    rs_rating=rs_rating,
+                    breakout_score=breakout_score,
+                )
+
+                if confidence < SCORE_MINIMUM_VIABLE:
+                    continue  # Below minimum threshold
+
+                result = PatternResult(
+                    ticker=ticker,
+                    pattern_type=pattern["pattern_type"],
+                    confidence_score=confidence,
+                    buy_point=pattern["buy_point"],
+                    current_price=pattern["current_price"],
+                    distance_to_pivot=pattern["distance_to_pivot"],
+                    base_depth=pattern["base_depth"],
+                    base_length_weeks=pattern["base_length_weeks"],
+                    volume_confirmation=pattern["volume_confirmation"],
+                    above_50ma=above_50,
+                    above_200ma=above_200,
+                    rs_rating=rs_rating,
+                    pattern_details=pattern,
+                    stop_loss_price=breakout_result["stop_loss_price"],
+                    profit_target_price=breakout_result["profit_target_price"],
+                    breakout_confirmed=breakout_result["breakout_confirmed"],
+                    volume_surge_pct=breakout_result["volume_surge_pct"],
+                    volume_rating=volume_rating,
+                    trend_score=trend_score,
+                )
+                results.append(result)
             except Exception as e:
                 logger.warning("Error detecting %s for %s: %s", detect_fn.__name__, ticker, e)
 
@@ -781,11 +859,26 @@ class StockScanner:
         Returns:
             List of PatternResult sorted by confidence_score descending.
         """
-        # Fetch SPY data for relative strength
+        # Fetch SPY data for relative strength and market regime
         spy_df = self._fetch_data("SPY")
         if spy_df is None:
             logger.error("Failed to fetch SPY data. RS ratings will be inaccurate.")
             spy_df = pd.DataFrame({"Close": [100] * TRADING_DAYS_PER_YEAR, "Volume": [1] * TRADING_DAYS_PER_YEAR})
+
+        # Market regime check
+        spy_with_ma = self.detector.add_moving_averages(spy_df)
+        self.market_regime = MarketRegime(spy_with_ma)
+        regime = self.market_regime.evaluate()
+        self._regime_status = regime["status"]
+
+        if regime["status"] == "correction":
+            logger.info("Market in correction — no buy signals.")
+            # Still run progress callbacks so UI completes
+            total = len(self.tickers)
+            for i, ticker in enumerate(self.tickers):
+                if progress_callback:
+                    progress_callback(i + 1, total, ticker)
+            return []
 
         all_results: list[PatternResult] = []
         total = len(self.tickers)

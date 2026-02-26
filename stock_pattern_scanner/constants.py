@@ -138,3 +138,59 @@ SSE_POLL_INTERVAL = 0.5
 PROGRESS_BAR_LENGTH = 30
 DEFAULT_TOP_RESULTS = 50
 NEAR_PIVOT_THRESHOLD = 5.0
+
+# ---------------------------------------------------------------------------
+# Market regime
+# ---------------------------------------------------------------------------
+REGIME_DISTRIBUTION_DAY_DECLINE_PCT = 0.2
+REGIME_DISTRIBUTION_DAY_LOOKBACK = 25
+REGIME_PRESSURE_DISTRIBUTION_DAYS = 4
+REGIME_CORRECTION_DISTRIBUTION_DAYS = 5
+REGIME_MA_SLOPE_LOOKBACK = 10
+
+# ---------------------------------------------------------------------------
+# Volume analysis
+# ---------------------------------------------------------------------------
+VOLUME_DRYUP_TAIL_DAYS = 10
+VOLUME_DRYUP_GOOD = 0.7
+VOLUME_UPDOWN_STRONG = 1.5
+VOLUME_UPDOWN_GOOD = 1.3
+
+# ---------------------------------------------------------------------------
+# Breakout rules
+# ---------------------------------------------------------------------------
+BREAKOUT_VOLUME_SURGE_PCT = 40.0
+BREAKOUT_CLOSE_UPPER_HALF = 0.5
+BREAKOUT_ENTRY_MAX_PCT = 2.0
+BREAKOUT_EXTENDED_PCT = 5.0
+STOP_LOSS_PCT = 7.0
+PROFIT_TARGET_PCT = 20.0
+
+# ---------------------------------------------------------------------------
+# Trend strength
+# ---------------------------------------------------------------------------
+ADX_PERIOD = 14
+ADX_STRONG = 30.0
+ADX_MINIMUM = 20.0
+ATR_PERIOD = 14
+ATR_MAX_RATIO_PCT = 5.0
+MA_SLOPE_LOOKBACK = 50
+
+# ---------------------------------------------------------------------------
+# Revised confidence scoring weights
+# ---------------------------------------------------------------------------
+SCORE_DEPTH_MAX_V2 = 15.0
+SCORE_VOLUME_PROFILE_MAX = 20.0
+SCORE_ABOVE_50MA_MAX_V2 = 10.0
+SCORE_ABOVE_200MA_MAX_V2 = 5.0
+SCORE_TIGHTNESS_MAX_V2 = 10.0
+SCORE_BASE_LENGTH_MAX_V2 = 5.0
+SCORE_PATTERN_BONUS_MAX_V2 = 10.0
+SCORE_TREND_STRENGTH_MAX = 10.0
+SCORE_RS_RATING_MAX = 10.0
+SCORE_BREAKOUT_QUALITY_MAX = 5.0
+SCORE_MINIMUM_VIABLE = 40.0
+
+# RS scoring thresholds
+RS_STRONG = 80.0
+RS_MODERATE = 60.0

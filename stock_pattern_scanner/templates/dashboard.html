@@ -319,6 +319,25 @@
         .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text-primary); }
         .empty-state p { font-size: 14px; }
 
+        /* Market banner */
+        .market-banner {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .market-banner.uptrend { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid rgba(63, 185, 80, 0.3); }
+        .market-banner.pressure { background: rgba(210, 153, 34, 0.15); color: var(--warning); border: 1px solid rgba(210, 153, 34, 0.3); }
+        .market-banner.correction { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid rgba(248, 81, 73, 0.3); }
+
+        /* Breakout status badges */
+        .status-breakout-confirmed { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+        .status-failed-breakout { background: rgba(248, 81, 73, 0.15); color: var(--danger); }
+
         /* Responsive */
         @media (max-width: 768px) {
             .stats { grid-template-columns: repeat(2, 1fr); }
@@ -335,6 +354,9 @@
     </div>
 
     <div class="container">
+        <!-- Market health banner -->
+        <div id="marketBanner" class="market-banner" style="display:none;"></div>
+
         <!-- Controls -->
         <div class="controls">
             <div class="control-group">
@@ -413,6 +435,8 @@
                 <option value="Near Pivot">Near Pivot</option>
                 <option value="Building">Building</option>
                 <option value="Extended">Extended</option>
+                <option value="Breakout Confirmed">Breakout Confirmed</option>
+                <option value="Failed Breakout">Failed Breakout</option>
             </select>
             <input type="text" id="filter-search" placeholder="Search ticker...">
             <div class="spacer"></div>
@@ -434,6 +458,9 @@
                         <th data-col="base_depth">Depth % <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="base_length_weeks">Weeks <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="rs_rating">RS <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="volume_rating">Vol Rating <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="stop_loss_price">Stop Loss <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="profit_target_price">Target <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="volume_confirmation">Vol <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="above_50ma">50MA <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="above_200ma">200MA <span class="sort-arrow">&#9650;</span></th>
@@ -598,7 +625,7 @@
 
             const tbody = document.getElementById('table-body');
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted);">No matching results</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-muted);">No matching results</td></tr>';
                 return;
             }
 
@@ -614,6 +641,9 @@
                     '<td>' + Math.round(r.base_depth) + '%</td>' +
                     '<td>' + r.base_length_weeks + '</td>' +
                     '<td>' + Math.round(r.rs_rating) + '</td>' +
+                    '<td>' + (r.volume_rating || 'C') + '</td>' +
+                    '<td>$' + fmt(r.stop_loss_price || 0) + '</td>' +
+                    '<td>$' + fmt(r.profit_target_price || 0) + '</td>' +
                     '<td>' + checkMark(r.volume_confirmation) + '</td>' +
                     '<td>' + checkMark(r.above_50ma) + '</td>' +
                     '<td>' + checkMark(r.above_200ma) + '</td>' +
@@ -735,8 +765,36 @@
             else if (status === 'Near Pivot') cls = 'status-near-pivot';
             else if (status === 'Building') cls = 'status-building';
             else if (status === 'Extended') cls = 'status-extended';
+            else if (status === 'Breakout Confirmed') cls = 'status-breakout-confirmed';
+            else if (status === 'Failed Breakout') cls = 'status-failed-breakout';
             return '<span class="status-badge ' + cls + '">' + esc(status) + '</span>';
         }
+
+        // Fetch market status on page load
+        async function fetchMarketStatus() {
+            try {
+                const res = await fetch('/api/market-status');
+                const data = await res.json();
+                const banner = document.getElementById('marketBanner');
+                if (data.status === 'confirmed_uptrend') {
+                    banner.className = 'market-banner uptrend';
+                    banner.textContent = 'Market: Confirmed Uptrend \u2014 ' + data.distribution_days + ' distribution days';
+                } else if (data.status === 'uptrend_under_pressure') {
+                    banner.className = 'market-banner pressure';
+                    banner.textContent = 'Market: Uptrend Under Pressure \u2014 ' + data.distribution_days + ' distribution days';
+                } else if (data.status === 'correction') {
+                    banner.className = 'market-banner correction';
+                    banner.textContent = 'Market: In Correction \u2014 Buy signals disabled';
+                } else {
+                    banner.style.display = 'none';
+                    return;
+                }
+                banner.style.display = 'flex';
+            } catch (e) {
+                console.error('Failed to fetch market status', e);
+            }
+        }
+        fetchMarketStatus();
     </script>
 </body>
 </html>

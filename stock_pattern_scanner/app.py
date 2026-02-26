@@ -18,7 +18,8 @@ from pydantic import BaseModel
 from constants import DEFAULT_MAX_WORKERS, SSE_POLL_INTERVAL
 from database import ScanDatabase
 from excel_export import export_to_excel
-from pattern_scanner import StockScanner
+from market_regime import MarketRegime
+from pattern_scanner import PatternDetector, StockScanner
 from ticker_lists import (
     DEFAULT_GROWTH_WATCHLIST,
     resolve_watchlist,
@@ -73,6 +74,23 @@ async def get_watchlists():
         "nasdaq100": {"name": "NASDAQ 100", "count": "~100"},
         "custom": {"name": "Custom Tickers", "count": "variable"},
     }
+
+
+@app.get("/api/market-status")
+async def market_status():
+    """Return current market regime based on SPY data."""
+    import yfinance as yf
+    try:
+        spy = yf.Ticker("SPY")
+        spy_df = spy.history(period="2y")
+        if spy_df is None or len(spy_df) < 200:
+            return {"status": "unknown", "error": "Could not fetch SPY data"}
+        detector = PatternDetector()
+        spy_df = detector.add_moving_averages(spy_df)
+        regime = MarketRegime(spy_df)
+        return regime.evaluate()
+    except Exception as e:
+        return {"status": "unknown", "error": str(e)}
 
 
 @app.post("/api/scan")
@@ -131,6 +149,12 @@ async def get_results(scan_id: str):
                 "above_50ma": r.above_50ma,
                 "above_200ma": r.above_200ma,
                 "rs_rating": r.rs_rating,
+                "stop_loss_price": r.stop_loss_price,
+                "profit_target_price": r.profit_target_price,
+                "breakout_confirmed": r.breakout_confirmed,
+                "volume_surge_pct": r.volume_surge_pct,
+                "volume_rating": r.volume_rating,
+                "trend_score": r.trend_score,
             }
             for r in results
         ],

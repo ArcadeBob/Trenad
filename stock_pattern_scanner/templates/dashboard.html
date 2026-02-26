@@ -4,9 +4,739 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Pattern Scanner</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --danger: #f85149;
+            --warning: #d29922;
+            --success: #3fb950;
+
+            --badge-cup: #58a6ff;
+            --badge-deep-cup: #bc8cff;
+            --badge-double-bottom: #3fb950;
+            --badge-flat-base: #f0883e;
+
+            --status-at-pivot: #f85149;
+            --status-near-pivot: #d29922;
+            --status-building: #8b949e;
+            --status-extended: #388bfd;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header h1 span { color: var(--accent); }
+        .header-right { color: var(--text-secondary); font-size: 13px; }
+
+        /* Main container */
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+        /* Controls */
+        .controls {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-end;
+            margin-bottom: 16px;
+        }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        select, input[type="text"], textarea {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            padding: 8px 12px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.3);
+        }
+        textarea { resize: vertical; min-height: 36px; height: 36px; width: 220px; }
+        .min-score-group { display: flex; flex-direction: column; gap: 6px; }
+        .score-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            height: 6px;
+            width: 120px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        .score-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+            min-width: 24px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .btn-primary {
+            background: #238636;
+            border-color: rgba(240, 246, 252, 0.1);
+            color: #fff;
+        }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-primary:disabled {
+            background: #21262d;
+            border-color: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .btn-secondary:hover { background: #30363d; border-color: var(--text-muted); }
+        .btn-secondary:disabled {
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Progress */
+        .progress-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .progress-section.visible { display: block; }
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .progress-label { color: var(--text-secondary); }
+        .progress-count { color: var(--text-primary); font-weight: 600; }
+        .progress-bar-bg {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            background: var(--accent);
+            height: 100%;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .progress-ticker {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Stats cards */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-card:nth-child(1) .stat-value { color: var(--accent); }
+        .stat-card:nth-child(2) .stat-value { color: var(--status-at-pivot); }
+        .stat-card:nth-child(3) .stat-value { color: var(--status-near-pivot); }
+        .stat-card:nth-child(4) .stat-value { color: var(--success); }
+
+        /* Filters & actions row */
+        .filters-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .filters-row select, .filters-row input[type="text"] { font-size: 13px; padding: 6px 10px; }
+        .filters-row input[type="text"] { width: 200px; }
+        .spacer { flex: 1; }
+
+        /* Results table */
+        .table-wrapper {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th {
+            background: var(--bg-tertiary);
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        thead th:hover { color: var(--text-primary); }
+        thead th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+        thead th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+        tbody tr { border-bottom: 1px solid var(--border); }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: rgba(88, 166, 255, 0.04); }
+        tbody td { padding: 10px 14px; white-space: nowrap; }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+        .badge-cup { background: rgba(88, 166, 255, 0.15); color: var(--badge-cup); }
+        .badge-deep-cup { background: rgba(188, 140, 255, 0.15); color: var(--badge-deep-cup); }
+        .badge-double-bottom { background: rgba(63, 185, 80, 0.15); color: var(--badge-double-bottom); }
+        .badge-flat-base { background: rgba(240, 136, 62, 0.15); color: var(--badge-flat-base); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-at-pivot { background: rgba(248, 81, 73, 0.15); color: var(--status-at-pivot); }
+        .status-near-pivot { background: rgba(210, 153, 34, 0.15); color: var(--status-near-pivot); }
+        .status-building { background: rgba(139, 148, 158, 0.15); color: var(--status-building); }
+        .status-extended { background: rgba(56, 139, 253, 0.15); color: var(--status-extended); }
+
+        /* Checks */
+        .check-yes { color: var(--success); }
+        .check-no { color: var(--text-muted); }
+
+        /* Score bar */
+        .score-cell { display: flex; align-items: center; gap: 8px; }
+        .score-bar {
+            width: 50px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .score-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text-primary); }
+        .empty-state p { font-size: 14px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .controls { flex-direction: column; align-items: stretch; }
+            textarea { width: 100%; }
+        }
+    </style>
 </head>
 <body>
-    <h1>Stock Pattern Scanner</h1>
-    <p>Dashboard placeholder — full UI coming in Task 13.</p>
+    <!-- Header -->
+    <div class="header">
+        <h1><span>&#9632;</span> Stock Pattern Scanner</h1>
+        <div class="header-right">CAN SLIM Base Pattern Detection</div>
+    </div>
+
+    <div class="container">
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label>Watchlist</label>
+                <select id="watchlist">
+                    <option value="default">Growth Watchlist</option>
+                    <option value="sp500">S&P 500</option>
+                    <option value="nasdaq100">NASDAQ 100</option>
+                    <option value="custom">Custom Tickers</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="custom-tickers-group" style="display:none;">
+                <label>Tickers (comma-separated)</label>
+                <textarea id="custom-tickers" placeholder="AAPL, MSFT, NVDA..."></textarea>
+            </div>
+
+            <div class="control-group min-score-group">
+                <label>Min Score</label>
+                <div class="score-display">
+                    <input type="range" id="min-score" min="0" max="100" value="0" step="5">
+                    <span class="score-value" id="min-score-display">0</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary" id="scan-btn" onclick="startScan()">Scan</button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-section" id="progress-section">
+            <div class="progress-header">
+                <span class="progress-label">Scanning stocks...</span>
+                <span class="progress-count" id="progress-count">0 / 0</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-bar"></div>
+            </div>
+            <div class="progress-ticker" id="progress-ticker">Preparing...</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats" id="stats-section" style="display:none;">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Total Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-at-pivot">0</div>
+                <div class="stat-label">At Pivot</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-near-pivot">0</div>
+                <div class="stat-label">Near Pivot</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-high-quality">0</div>
+                <div class="stat-label">High Quality</div>
+            </div>
+        </div>
+
+        <!-- Filters & export -->
+        <div class="filters-row" id="filters-row" style="display:none;">
+            <select id="filter-pattern">
+                <option value="">All Patterns</option>
+                <option value="Cup & Handle">Cup & Handle</option>
+                <option value="Deep Cup & Handle">Deep Cup & Handle</option>
+                <option value="Double Bottom">Double Bottom</option>
+                <option value="Flat Base">Flat Base</option>
+            </select>
+            <select id="filter-status">
+                <option value="">All Statuses</option>
+                <option value="At Pivot">At Pivot</option>
+                <option value="Near Pivot">Near Pivot</option>
+                <option value="Building">Building</option>
+                <option value="Extended">Extended</option>
+            </select>
+            <input type="text" id="filter-search" placeholder="Search ticker...">
+            <div class="spacer"></div>
+            <button class="btn btn-secondary" id="export-btn" onclick="exportExcel()" disabled>Export Excel</button>
+        </div>
+
+        <!-- Results table -->
+        <div class="table-wrapper" id="table-wrapper" style="display:none;">
+            <table>
+                <thead>
+                    <tr id="table-head">
+                        <th data-col="ticker">Ticker <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="pattern_type">Pattern <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="confidence_score" class="sorted">Score <span class="sort-arrow">&#9660;</span></th>
+                        <th data-col="status">Status <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="buy_point">Buy Point <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="current_price">Price <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="distance_to_pivot">Dist % <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="base_depth">Depth % <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="base_length_weeks">Weeks <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="rs_rating">RS <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="volume_confirmation">Vol <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="above_50ma">50MA <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="above_200ma">200MA <span class="sort-arrow">&#9650;</span></th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty-state" id="empty-state">
+            <h3>No scan results yet</h3>
+            <p>Select a watchlist and click Scan to detect base patterns.</p>
+        </div>
+    </div>
+
+    <script>
+        let allResults = [];
+        let currentScanId = null;
+        let sortCol = 'confidence_score';
+        let sortAsc = false;
+
+        // Toggle custom tickers visibility
+        document.getElementById('watchlist').addEventListener('change', function() {
+            document.getElementById('custom-tickers-group').style.display =
+                this.value === 'custom' ? '' : 'none';
+        });
+
+        // Min score slider
+        document.getElementById('min-score').addEventListener('input', function() {
+            document.getElementById('min-score-display').textContent = this.value;
+        });
+
+        // Start scan
+        async function startScan() {
+            const scanBtn = document.getElementById('scan-btn');
+            scanBtn.disabled = true;
+            scanBtn.textContent = 'Scanning...';
+
+            const watchlist = document.getElementById('watchlist').value;
+            const minScore = parseInt(document.getElementById('min-score').value);
+
+            const body = { watchlist: watchlist, min_score: minScore };
+            if (watchlist === 'custom') {
+                const raw = document.getElementById('custom-tickers').value;
+                const tickers = raw.split(/[,\s]+/).map(t => t.trim().toUpperCase()).filter(Boolean);
+                if (tickers.length === 0) {
+                    scanBtn.disabled = false;
+                    scanBtn.textContent = 'Scan';
+                    return;
+                }
+                body.tickers = tickers;
+            }
+
+            // Show progress, hide results
+            document.getElementById('progress-section').classList.add('visible');
+            document.getElementById('stats-section').style.display = 'none';
+            document.getElementById('filters-row').style.display = 'none';
+            document.getElementById('table-wrapper').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('progress-bar').style.width = '0%';
+            document.getElementById('progress-count').textContent = '0 / 0';
+            document.getElementById('progress-ticker').textContent = 'Starting scan...';
+
+            try {
+                const resp = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await resp.json();
+                currentScanId = data.scan_id;
+                listenProgress(data.scan_id);
+            } catch (err) {
+                scanBtn.disabled = false;
+                scanBtn.textContent = 'Scan';
+                document.getElementById('progress-section').classList.remove('visible');
+                alert('Failed to start scan: ' + err.message);
+            }
+        }
+
+        // SSE progress listener
+        function listenProgress(scanId) {
+            const evtSource = new EventSource('/api/scan/' + scanId + '/progress');
+
+            evtSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                const current = data.current || 0;
+                const total = data.total || 1;
+                const pct = Math.round((current / total) * 100);
+
+                document.getElementById('progress-bar').style.width = pct + '%';
+                document.getElementById('progress-count').textContent = current + ' / ' + total;
+                document.getElementById('progress-ticker').textContent =
+                    data.ticker ? 'Processing: ' + data.ticker : 'Preparing...';
+
+                if (data.status === 'completed') {
+                    evtSource.close();
+                    document.getElementById('progress-ticker').textContent = 'Scan complete!';
+                    loadResults(scanId);
+                } else if (data.status === 'failed') {
+                    evtSource.close();
+                    document.getElementById('progress-ticker').textContent = 'Scan failed.';
+                    document.getElementById('scan-btn').disabled = false;
+                    document.getElementById('scan-btn').textContent = 'Scan';
+                }
+            };
+
+            evtSource.onerror = function() {
+                evtSource.close();
+                document.getElementById('progress-ticker').textContent = 'Connection lost.';
+                document.getElementById('scan-btn').disabled = false;
+                document.getElementById('scan-btn').textContent = 'Scan';
+            };
+        }
+
+        // Load results
+        async function loadResults(scanId) {
+            try {
+                const resp = await fetch('/api/scan/' + scanId + '/results');
+                const data = await resp.json();
+                allResults = data.results || [];
+
+                updateStats();
+                renderTable();
+
+                // Show UI sections
+                document.getElementById('stats-section').style.display = '';
+                document.getElementById('filters-row').style.display = '';
+                document.getElementById('table-wrapper').style.display = '';
+                document.getElementById('empty-state').style.display =
+                    allResults.length === 0 ? '' : 'none';
+                document.getElementById('export-btn').disabled = allResults.length === 0;
+
+                // Fade out progress after a moment
+                setTimeout(function() {
+                    document.getElementById('progress-section').classList.remove('visible');
+                }, 1500);
+            } catch (err) {
+                alert('Failed to load results: ' + err.message);
+            }
+
+            document.getElementById('scan-btn').disabled = false;
+            document.getElementById('scan-btn').textContent = 'Scan';
+        }
+
+        // Update stat cards
+        function updateStats() {
+            document.getElementById('stat-total').textContent = allResults.length;
+            document.getElementById('stat-at-pivot').textContent =
+                allResults.filter(r => r.status === 'At Pivot').length;
+            document.getElementById('stat-near-pivot').textContent =
+                allResults.filter(r => r.status === 'Near Pivot').length;
+            document.getElementById('stat-high-quality').textContent =
+                allResults.filter(r => r.confidence_score >= 75).length;
+        }
+
+        // Render table with current filters and sort
+        function renderTable() {
+            let filtered = filterResults();
+            filtered = sortResults(filtered);
+
+            const tbody = document.getElementById('table-body');
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-muted);">No matching results</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(function(r) {
+                return '<tr>' +
+                    '<td><strong>' + esc(r.ticker) + '</strong></td>' +
+                    '<td>' + patternBadge(r.pattern_type) + '</td>' +
+                    '<td>' + scoreCell(r.confidence_score) + '</td>' +
+                    '<td>' + statusBadge(r.status) + '</td>' +
+                    '<td>$' + fmt(r.buy_point) + '</td>' +
+                    '<td>$' + fmt(r.current_price) + '</td>' +
+                    '<td>' + fmtPct(r.distance_to_pivot) + '</td>' +
+                    '<td>' + Math.round(r.base_depth) + '%</td>' +
+                    '<td>' + r.base_length_weeks + '</td>' +
+                    '<td>' + Math.round(r.rs_rating) + '</td>' +
+                    '<td>' + checkMark(r.volume_confirmation) + '</td>' +
+                    '<td>' + checkMark(r.above_50ma) + '</td>' +
+                    '<td>' + checkMark(r.above_200ma) + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        // Filter results based on dropdowns and search
+        function filterResults() {
+            const pattern = document.getElementById('filter-pattern').value;
+            const status = document.getElementById('filter-status').value;
+            const search = document.getElementById('filter-search').value.toUpperCase();
+
+            return allResults.filter(function(r) {
+                if (pattern && r.pattern_type !== pattern) return false;
+                if (status && r.status !== status) return false;
+                if (search && r.ticker.indexOf(search) === -1) return false;
+                return true;
+            });
+        }
+
+        // Sort results
+        function sortResults(results) {
+            return results.slice().sort(function(a, b) {
+                let va = a[sortCol], vb = b[sortCol];
+                if (typeof va === 'string') {
+                    va = va.toLowerCase();
+                    vb = vb.toLowerCase();
+                }
+                if (va < vb) return sortAsc ? -1 : 1;
+                if (va > vb) return sortAsc ? 1 : -1;
+                return 0;
+            });
+        }
+
+        // Table header click => sort
+        document.getElementById('table-head').addEventListener('click', function(e) {
+            const th = e.target.closest('th');
+            if (!th) return;
+            const col = th.getAttribute('data-col');
+            if (!col) return;
+
+            if (sortCol === col) {
+                sortAsc = !sortAsc;
+            } else {
+                sortCol = col;
+                sortAsc = true;
+            }
+
+            // Update header arrows
+            document.querySelectorAll('#table-head th').forEach(function(h) {
+                h.classList.remove('sorted');
+                h.querySelector('.sort-arrow').innerHTML = '&#9650;';
+            });
+            th.classList.add('sorted');
+            th.querySelector('.sort-arrow').innerHTML = sortAsc ? '&#9650;' : '&#9660;';
+
+            renderTable();
+        });
+
+        // Filter change listeners
+        document.getElementById('filter-pattern').addEventListener('change', renderTable);
+        document.getElementById('filter-status').addEventListener('change', renderTable);
+        document.getElementById('filter-search').addEventListener('input', renderTable);
+
+        // Export Excel
+        function exportExcel() {
+            if (!currentScanId) return;
+            window.location.href = '/api/export/excel/' + currentScanId;
+        }
+
+        // Helpers
+        function esc(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function fmt(n) {
+            return n != null ? n.toFixed(2) : '-';
+        }
+
+        function fmtPct(n) {
+            if (n == null) return '-';
+            var sign = n >= 0 ? '+' : '';
+            return sign + n.toFixed(1) + '%';
+        }
+
+        function checkMark(val) {
+            return val
+                ? '<span class="check-yes">&#10003;</span>'
+                : '<span class="check-no">&#10007;</span>';
+        }
+
+        function scoreCell(score) {
+            var color;
+            if (score >= 75) color = 'var(--success)';
+            else if (score >= 50) color = 'var(--warning)';
+            else color = 'var(--text-muted)';
+
+            return '<div class="score-cell">' +
+                '<span style="color:' + color + ';font-weight:600;">' + Math.round(score) + '</span>' +
+                '<div class="score-bar"><div class="score-bar-fill" style="width:' + score + '%;background:' + color + ';"></div></div>' +
+                '</div>';
+        }
+
+        function patternBadge(type) {
+            var cls = '';
+            if (type === 'Cup & Handle') cls = 'badge-cup';
+            else if (type === 'Deep Cup & Handle') cls = 'badge-deep-cup';
+            else if (type === 'Double Bottom') cls = 'badge-double-bottom';
+            else if (type === 'Flat Base') cls = 'badge-flat-base';
+            return '<span class="badge ' + cls + '">' + esc(type) + '</span>';
+        }
+
+        function statusBadge(status) {
+            var cls = '';
+            if (status === 'At Pivot') cls = 'status-at-pivot';
+            else if (status === 'Near Pivot') cls = 'status-near-pivot';
+            else if (status === 'Building') cls = 'status-building';
+            else if (status === 'Extended') cls = 'status-extended';
+            return '<span class="status-badge ' + cls + '">' + esc(status) + '</span>';
+        }
+    </script>
 </body>
 </html>

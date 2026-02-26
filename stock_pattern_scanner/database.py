@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -17,6 +18,7 @@ class ScanDatabase:
 
     def __init__(self, db_path: str = "scanner.db"):
         self.db_path = db_path
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._init_db()
 
     @contextmanager

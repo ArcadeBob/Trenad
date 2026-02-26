@@ -88,15 +88,27 @@ def main():
         uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
         return
 
-    tickers = resolve_tickers(args)
+    try:
+        tickers = resolve_tickers(args)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
     print(f"\nStock Base Pattern Scanner")
     print(f"{'\u2550' * 40}")
     print(f"Scanning {len(tickers)} tickers...\n")
 
-    start_time = time.time()
-    scanner = StockScanner(tickers=tickers, max_workers=5)
-    results = scanner.scan(progress_callback=print_progress)
-    elapsed = time.time() - start_time
+    try:
+        start_time = time.time()
+        scanner = StockScanner(tickers=tickers, max_workers=5)
+        results = scanner.scan(progress_callback=print_progress)
+        elapsed = time.time() - start_time
+    except KeyboardInterrupt:
+        print("\n\nScan interrupted.")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n\nScan failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
     print(f"\n\nScan complete in {elapsed:.1f}s \u2014 {len(results)} patterns found\n")
 

@@ -3,8 +3,9 @@ Ticker lists module: default growth watchlist, S&P 500 / NASDAQ-100 fetching
 from Wikipedia with hardcoded fallbacks.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import List
 
 import pandas as pd
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 # DEFAULT GROWTH WATCHLIST (~100 tickers across categories)
 # ---------------------------------------------------------------------------
 
-DEFAULT_GROWTH_WATCHLIST: List[str] = [
+DEFAULT_GROWTH_WATCHLIST: list[str] = [
     # Software / Cloud
     "NOW", "CRM", "WDAY", "TEAM", "DDOG", "SNOW", "NET", "ZS", "CRWD",
     "PANW", "FTNT", "HUBS", "MNDY", "TTD", "BILL", "MDB", "CFLT", "ESTC",
@@ -41,7 +42,7 @@ DEFAULT_GROWTH_WATCHLIST: List[str] = [
 # S&P 500 FALLBACK (snapshot as of early 2025)
 # ---------------------------------------------------------------------------
 
-SP500_FALLBACK: List[str] = [
+SP500_FALLBACK: list[str] = [
     "MMM", "AOS", "ABT", "ABBV", "ACN", "ADBE", "AMD", "AES", "AFL",
     "A", "APD", "ABNB", "AKAM", "ALB", "ARE", "ALGN", "ALLE", "LNT",
     "ALL", "GOOGL", "GOOG", "MO", "AMZN", "AMCR", "AEE", "AAL", "AEP",
@@ -105,7 +106,7 @@ SP500_FALLBACK: List[str] = [
 # NASDAQ-100 FALLBACK (snapshot as of early 2025)
 # ---------------------------------------------------------------------------
 
-NASDAQ100_FALLBACK: List[str] = [
+NASDAQ100_FALLBACK: list[str] = [
     "AAPL", "ABNB", "ADBE", "ADI", "ADP", "ADSK", "AEP", "AMAT", "AMD",
     "AMGN", "AMZN", "ANSS", "ARM", "ASML", "AVGO", "AZN", "BIIB", "BKNG",
     "BKR", "CCEP", "CDNS", "CDW", "CEG", "CHTR", "CMCSA", "COIN", "COST",
@@ -128,7 +129,7 @@ _SP500_WIKI_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 _NASDAQ100_WIKI_URL = "https://en.wikipedia.org/wiki/Nasdaq-100"
 
 
-def get_sp500_tickers() -> List[str]:
+def get_sp500_tickers() -> list[str]:
     """Fetch S&P 500 tickers from Wikipedia.
 
     Returns the hardcoded fallback list if the fetch fails for any reason.
@@ -151,7 +152,7 @@ def get_sp500_tickers() -> List[str]:
     return list(SP500_FALLBACK)
 
 
-def get_nasdaq100_tickers() -> List[str]:
+def get_nasdaq100_tickers() -> list[str]:
     """Fetch NASDAQ-100 tickers from Wikipedia.
 
     Dynamically searches all tables on the page for one that contains a
@@ -175,3 +176,22 @@ def get_nasdaq100_tickers() -> List[str]:
     except Exception as exc:
         logger.warning("Failed to fetch NASDAQ-100 tickers from Wikipedia: %s", exc)
     return list(NASDAQ100_FALLBACK)
+
+
+def resolve_watchlist(watchlist: str, custom_tickers: list[str] | None = None) -> list[str]:
+    """Resolve a watchlist name to a list of ticker symbols.
+
+    Args:
+        watchlist: One of 'default', 'sp500', 'nasdaq100', or 'custom'.
+        custom_tickers: Required when watchlist is 'custom'.
+
+    Returns:
+        List of uppercase ticker strings.
+    """
+    if custom_tickers:
+        return [t.upper() for t in custom_tickers]
+    if watchlist == "sp500":
+        return get_sp500_tickers()
+    if watchlist == "nasdaq100":
+        return get_nasdaq100_tickers()
+    return list(DEFAULT_GROWTH_WATCHLIST)

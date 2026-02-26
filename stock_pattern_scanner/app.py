@@ -20,8 +20,7 @@ from excel_export import export_to_excel
 from pattern_scanner import StockScanner
 from ticker_lists import (
     DEFAULT_GROWTH_WATCHLIST,
-    get_sp500_tickers,
-    get_nasdaq100_tickers,
+    resolve_watchlist,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,16 +42,6 @@ class ScanRequest(BaseModel):
     watchlist: str = "default"
     tickers: Optional[list[str]] = None
     min_score: float = 0
-
-
-def _resolve_tickers(request: ScanRequest) -> list[str]:
-    if request.tickers:
-        return request.tickers
-    if request.watchlist == "sp500":
-        return get_sp500_tickers()
-    if request.watchlist == "nasdaq100":
-        return get_nasdaq100_tickers()
-    return DEFAULT_GROWTH_WATCHLIST
 
 
 def _run_scan(scan_id: str, tickers: list[str], min_score: float):
@@ -91,7 +80,7 @@ async def get_watchlists():
 
 @app.post("/api/scan")
 async def start_scan(request: ScanRequest):
-    tickers = _resolve_tickers(request)
+    tickers = resolve_watchlist(request.watchlist, request.tickers)
     scan_id = db.create_scan(watchlist=request.watchlist, tickers=tickers)
 
     thread = threading.Thread(

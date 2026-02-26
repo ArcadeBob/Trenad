@@ -9,11 +9,7 @@ import time
 
 from pattern_scanner import StockScanner
 from excel_export import export_to_excel
-from ticker_lists import (
-    DEFAULT_GROWTH_WATCHLIST,
-    get_sp500_tickers,
-    get_nasdaq100_tickers,
-)
+from ticker_lists import resolve_watchlist
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -38,18 +34,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def resolve_tickers(args: argparse.Namespace) -> list[str]:
-    if args.tickers:
-        return [t.upper() for t in args.tickers]
     if args.file:
-        with open(args.file) as f:
+        with open(args.file, encoding="utf-8") as f:
             return [line.strip().upper() for line in f if line.strip()]
+    if args.tickers:
+        return resolve_watchlist("custom", args.tickers)
     if args.sp500:
         print("Fetching S&P 500 ticker list...")
-        return get_sp500_tickers()
+        return resolve_watchlist("sp500")
     if args.nasdaq100:
         print("Fetching NASDAQ 100 ticker list...")
-        return get_nasdaq100_tickers()
-    return DEFAULT_GROWTH_WATCHLIST
+        return resolve_watchlist("nasdaq100")
+    return resolve_watchlist("default")
 
 
 def print_progress(current: int, total: int, ticker: str):

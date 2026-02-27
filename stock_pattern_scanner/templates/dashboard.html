@@ -527,7 +527,7 @@
             </div>
 
             <div class="control-group min-score-group">
-                <label>Min Score</label>
+                <label>Min Score <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Filters results to only show patterns with a confidence score at or above this value. The score (0-100) measures how closely a pattern matches the ideal textbook formation. Higher scores are more reliable.</span></span></label>
                 <div class="score-display">
                     <input type="range" id="min-score" min="0" max="100" value="0" step="5">
                     <span class="score-value" id="min-score-display">0</span>
@@ -556,19 +556,19 @@
         <div class="stats" id="stats-section" style="display:none;">
             <div class="stat-card">
                 <div class="stat-value" id="stat-total">0</div>
-                <div class="stat-label">Total Found</div>
+                <div class="stat-label">Total Found <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">How many base patterns the scan detected across all stocks in the watchlist.</span></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-at-pivot">0</div>
-                <div class="stat-label">At Pivot</div>
+                <div class="stat-label">At Pivot <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Stocks where the current price is within 1% of the buy point. These are actionable now — ready to buy if volume confirms the breakout.</span></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-near-pivot">0</div>
-                <div class="stat-label">Near Pivot</div>
+                <div class="stat-label">Near Pivot <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Stocks within 1-5% below the buy point. Keep these on your watch list — they could reach the buy point soon.</span></span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-high-quality">0</div>
-                <div class="stat-label">High Quality</div>
+                <div class="stat-label">High Quality <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Patterns scoring 75 or above out of 100. These most closely match the ideal formation and have the best historical success rate.</span></span></div>
             </div>
         </div>
 
@@ -1041,13 +1041,13 @@
                 const banner = document.getElementById('marketBanner');
                 if (data.status === 'confirmed_uptrend') {
                     banner.className = 'market-banner uptrend';
-                    banner.textContent = 'Market: Confirmed Uptrend \u2014 ' + data.distribution_days + ' distribution days';
+                    banner.innerHTML = 'Market: Confirmed Uptrend \u2014 ' + data.distribution_days + ' distribution days <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The overall market is healthy and trending higher. This is the best environment for buying breakouts. Distribution days are days where the S&amp;P 500 drops more than 0.2% on above-average volume \u2014 too many signal institutional selling.</span></span>';
                 } else if (data.status === 'uptrend_under_pressure') {
                     banner.className = 'market-banner pressure';
-                    banner.textContent = 'Market: Uptrend Under Pressure \u2014 ' + data.distribution_days + ' distribution days';
+                    banner.innerHTML = 'Market: Uptrend Under Pressure \u2014 ' + data.distribution_days + ' distribution days <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The market is still in an uptrend but showing signs of stress from institutional selling. Be more selective with new buys and keep positions smaller.</span></span>';
                 } else if (data.status === 'correction') {
                     banner.className = 'market-banner correction';
-                    banner.textContent = 'Market: In Correction \u2014 Buy signals disabled';
+                    banner.innerHTML = 'Market: In Correction \u2014 Buy signals disabled <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The market is in a downtrend. Most breakouts fail during corrections \u2014 avoid new buys until the market confirms a new uptrend.</span></span>';
                 } else {
                     banner.style.display = 'none';
                     return;

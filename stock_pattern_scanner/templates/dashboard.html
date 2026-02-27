@@ -338,11 +338,77 @@
         .status-breakout-confirmed { background: rgba(63, 185, 80, 0.15); color: var(--success); }
         .status-failed-breakout { background: rgba(248, 81, 73, 0.15); color: var(--danger); }
 
+        /* Tabs */
+        .header-tabs { display: flex; gap: 4px; }
+        .tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-secondary);
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+        }
+        .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active {
+            background: var(--bg-tertiary);
+            border-color: var(--border);
+            color: var(--text-primary);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Backtest specific */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .breakdown-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .breakdown-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .breakdown-card h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .breakdown-table { width: 100%; font-size: 13px; }
+        .breakdown-table th {
+            text-align: left;
+            padding: 6px 8px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+        }
+        .breakdown-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .pnl-positive { color: var(--success); }
+        .pnl-negative { color: var(--danger); }
+        .pnl-open { color: var(--warning); }
+
         /* Responsive */
         @media (max-width: 768px) {
             .stats { grid-template-columns: repeat(2, 1fr); }
             .controls { flex-direction: column; align-items: stretch; }
             textarea { width: 100%; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .breakdown-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -350,10 +416,16 @@
     <!-- Header -->
     <div class="header">
         <h1><span>&#9632;</span> Stock Pattern Scanner</h1>
+        <div class="header-tabs">
+            <button class="tab-btn active" onclick="switchTab('scanner')">Scanner</button>
+            <button class="tab-btn" onclick="switchTab('backtest')">Backtest</button>
+        </div>
         <div class="header-right">CAN SLIM Base Pattern Detection</div>
     </div>
 
     <div class="container">
+        <!-- Scanner Tab -->
+        <div id="scanner-tab" class="tab-content active">
         <!-- Market health banner -->
         <div id="marketBanner" class="market-banner" style="display:none;"></div>
 
@@ -474,6 +546,117 @@
         <div class="empty-state" id="empty-state">
             <h3>No scan results yet</h3>
             <p>Select a watchlist and click Scan to detect base patterns.</p>
+        </div>
+        </div>
+
+        <!-- Backtest Tab -->
+        <div id="backtest-tab" class="tab-content">
+            <!-- Backtest controls -->
+            <div class="controls">
+                <div class="control-group">
+                    <label>Watchlist</label>
+                    <select id="bt-watchlist">
+                        <option value="default">Growth Watchlist</option>
+                        <option value="sp500">S&P 500</option>
+                        <option value="nasdaq100">NASDAQ 100</option>
+                        <option value="custom">Custom Tickers</option>
+                    </select>
+                </div>
+                <div class="control-group" id="bt-custom-group" style="display:none;">
+                    <label>Tickers</label>
+                    <textarea id="bt-custom-tickers" placeholder="AAPL, MSFT, NVDA..."></textarea>
+                </div>
+                <div class="control-group">
+                    <label>Stop Loss %</label>
+                    <input type="text" id="bt-stop-loss" value="7" style="width:60px;">
+                </div>
+                <div class="control-group">
+                    <label>Profit Target %</label>
+                    <input type="text" id="bt-profit-target" value="20" style="width:60px;">
+                </div>
+                <div class="control-group">
+                    <label>Min Confidence</label>
+                    <input type="text" id="bt-min-conf" value="40" style="width:60px;">
+                </div>
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button class="btn btn-primary" id="bt-run-btn" onclick="startBacktest()">Run Backtest</button>
+                </div>
+            </div>
+
+            <!-- Backtest progress -->
+            <div class="progress-section" id="bt-progress">
+                <div class="progress-header">
+                    <span class="progress-label">Running backtest...</span>
+                    <span class="progress-count" id="bt-progress-count">0 / 0</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="bt-progress-bar"></div>
+                </div>
+                <div class="progress-ticker" id="bt-progress-status">Preparing...</div>
+            </div>
+
+            <!-- Backtest summary metrics -->
+            <div class="metrics-grid" id="bt-metrics" style="display:none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="bt-total-trades" style="color:var(--accent);">0</div>
+                    <div class="stat-label">Total Trades</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bt-win-rate" style="color:var(--success);">0%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bt-profit-factor-val" style="color:var(--accent);">0</div>
+                    <div class="stat-label">Profit Factor</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bt-avg-return" style="color:var(--success);">0%</div>
+                    <div class="stat-label">Avg Return</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bt-expectancy" style="color:var(--accent);">0%</div>
+                    <div class="stat-label">Expectancy</div>
+                </div>
+            </div>
+
+            <!-- Breakdowns -->
+            <div class="breakdown-grid" id="bt-breakdowns" style="display:none;">
+                <div class="breakdown-card">
+                    <h3>By Pattern Type</h3>
+                    <table class="breakdown-table" id="bt-by-pattern"><thead><tr><th>Pattern</th><th>Trades</th><th>Win Rate</th><th>Avg Return</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div class="breakdown-card">
+                    <h3>By Confidence Band</h3>
+                    <table class="breakdown-table" id="bt-by-confidence"><thead><tr><th>Band</th><th>Trades</th><th>Win Rate</th><th>Avg Return</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div class="breakdown-card">
+                    <h3>By Market Regime</h3>
+                    <table class="breakdown-table" id="bt-by-regime"><thead><tr><th>Regime</th><th>Trades</th><th>Win Rate</th><th>Avg Return</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div class="breakdown-card">
+                    <h3>Win/Loss Summary</h3>
+                    <table class="breakdown-table" id="bt-winloss"><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+
+            <!-- Trade log -->
+            <div class="table-wrapper" id="bt-trades-table" style="display:none;">
+                <table>
+                    <thead><tr>
+                        <th>Ticker</th><th>Pattern</th><th>Score</th><th>Detected</th>
+                        <th>Entry</th><th>Entry $</th><th>Exit</th><th>Exit $</th>
+                        <th>Reason</th><th>P&L %</th><th>Regime</th>
+                    </tr></thead>
+                    <tbody id="bt-trades-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Empty state -->
+            <div class="empty-state" id="bt-empty">
+                <h3>No backtest results yet</h3>
+                <p>Configure parameters and click Run Backtest to validate patterns.</p>
+            </div>
         </div>
     </div>
 
@@ -795,6 +978,180 @@
             }
         }
         fetchMarketStatus();
+
+        // --- Tab switching ---
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tab + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // --- Backtest ---
+        document.getElementById('bt-watchlist').addEventListener('change', function() {
+            document.getElementById('bt-custom-group').style.display =
+                this.value === 'custom' ? '' : 'none';
+        });
+
+        async function startBacktest() {
+            var btn = document.getElementById('bt-run-btn');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            var watchlist = document.getElementById('bt-watchlist').value;
+            var body = {
+                watchlist: watchlist,
+                stop_loss_pct: parseFloat(document.getElementById('bt-stop-loss').value) || 7,
+                profit_target_pct: parseFloat(document.getElementById('bt-profit-target').value) || 20,
+                min_confidence: parseFloat(document.getElementById('bt-min-conf').value) || 40,
+            };
+            if (watchlist === 'custom') {
+                var raw = document.getElementById('bt-custom-tickers').value;
+                body.tickers = raw.split(/[,\s]+/).map(function(t) { return t.trim().toUpperCase(); }).filter(Boolean);
+                if (body.tickers.length === 0) { btn.disabled = false; btn.textContent = 'Run Backtest'; return; }
+            }
+
+            document.getElementById('bt-progress').classList.add('visible');
+            document.getElementById('bt-metrics').style.display = 'none';
+            document.getElementById('bt-breakdowns').style.display = 'none';
+            document.getElementById('bt-trades-table').style.display = 'none';
+            document.getElementById('bt-empty').style.display = 'none';
+            document.getElementById('bt-progress-bar').style.width = '0%';
+
+            try {
+                var resp = await fetch('/api/backtest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                var data = await resp.json();
+                listenBacktestProgress(data.backtest_id);
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Run Backtest';
+                document.getElementById('bt-progress').classList.remove('visible');
+                alert('Failed to start backtest: ' + err.message);
+            }
+        }
+
+        function listenBacktestProgress(btId) {
+            var evtSource = new EventSource('/api/backtest/' + btId + '/progress');
+
+            evtSource.onmessage = function(event) {
+                var data = JSON.parse(event.data);
+                var current = data.current || 0;
+                var total = data.total || 1;
+                var pct = Math.round((current / total) * 100);
+
+                document.getElementById('bt-progress-bar').style.width = pct + '%';
+                document.getElementById('bt-progress-count').textContent = current + ' / ' + total;
+                document.getElementById('bt-progress-status').textContent = 'Analyzing historical patterns... ' + pct + '%';
+
+                if (data.status === 'completed') {
+                    evtSource.close();
+                    document.getElementById('bt-progress-status').textContent = 'Backtest complete!';
+                    loadBacktestResults(btId);
+                } else if (data.status && data.status.startsWith('failed')) {
+                    evtSource.close();
+                    document.getElementById('bt-progress-status').textContent = 'Backtest failed.';
+                    document.getElementById('bt-run-btn').disabled = false;
+                    document.getElementById('bt-run-btn').textContent = 'Run Backtest';
+                }
+            };
+
+            evtSource.onerror = function() {
+                evtSource.close();
+                document.getElementById('bt-run-btn').disabled = false;
+                document.getElementById('bt-run-btn').textContent = 'Run Backtest';
+            };
+        }
+
+        async function loadBacktestResults(btId) {
+            try {
+                var resp = await fetch('/api/backtest/' + btId + '/results');
+                var data = await resp.json();
+                var m = data.metrics;
+                var trades = data.trades || [];
+
+                // Summary metrics
+                document.getElementById('bt-total-trades').textContent = m.total_trades;
+                document.getElementById('bt-win-rate').textContent = m.win_rate + '%';
+                document.getElementById('bt-win-rate').style.color = m.win_rate >= 50 ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('bt-profit-factor-val').textContent = m.profit_factor === Infinity ? '\u221e' : m.profit_factor.toFixed(2);
+                document.getElementById('bt-avg-return').textContent = (m.avg_return >= 0 ? '+' : '') + m.avg_return + '%';
+                document.getElementById('bt-avg-return').style.color = m.avg_return >= 0 ? 'var(--success)' : 'var(--danger)';
+                document.getElementById('bt-expectancy').textContent = (m.expectancy >= 0 ? '+' : '') + m.expectancy + '%';
+
+                // Breakdowns
+                renderBreakdown('bt-by-pattern', m.by_pattern);
+                renderBreakdown('bt-by-confidence', m.by_confidence);
+                renderBreakdown('bt-by-regime', m.by_regime);
+
+                // Win/loss summary
+                var wl = document.querySelector('#bt-winloss tbody');
+                wl.innerHTML =
+                    '<tr><td>Avg Win</td><td class="pnl-positive">+' + m.avg_win + '%</td></tr>' +
+                    '<tr><td>Avg Loss</td><td class="pnl-negative">' + m.avg_loss + '%</td></tr>' +
+                    '<tr><td>Profit Factor</td><td>' + (m.profit_factor === Infinity ? '\u221e' : m.profit_factor.toFixed(2)) + '</td></tr>';
+
+                // Trade log
+                var tbody = document.getElementById('bt-trades-body');
+                tbody.innerHTML = trades.map(function(t) {
+                    var pnlClass = t.exit_reason === 'open' ? 'pnl-open' : (t.pnl_pct >= 0 ? 'pnl-positive' : 'pnl-negative');
+                    var reasonBadge = t.exit_reason === 'target' ? '<span class="status-badge status-breakout-confirmed">Target</span>' :
+                                      t.exit_reason === 'stop' ? '<span class="status-badge status-at-pivot">Stop</span>' :
+                                      '<span class="status-badge status-building">Open</span>';
+                    return '<tr>' +
+                        '<td><strong>' + esc(t.ticker) + '</strong></td>' +
+                        '<td>' + patternBadge(t.pattern_type) + '</td>' +
+                        '<td>' + Math.round(t.confidence_score) + '</td>' +
+                        '<td>' + t.detection_date + '</td>' +
+                        '<td>' + (t.entry_date || '-') + '</td>' +
+                        '<td>$' + (t.entry_price ? t.entry_price.toFixed(2) : '-') + '</td>' +
+                        '<td>' + (t.exit_date || '-') + '</td>' +
+                        '<td>$' + (t.exit_price ? t.exit_price.toFixed(2) : '-') + '</td>' +
+                        '<td>' + reasonBadge + '</td>' +
+                        '<td class="' + pnlClass + '">' + (t.pnl_pct >= 0 ? '+' : '') + t.pnl_pct + '%</td>' +
+                        '<td>' + formatRegime(t.market_regime) + '</td>' +
+                        '</tr>';
+                }).join('');
+
+                // Show sections
+                document.getElementById('bt-metrics').style.display = '';
+                document.getElementById('bt-breakdowns').style.display = '';
+                document.getElementById('bt-trades-table').style.display = trades.length > 0 ? '' : 'none';
+                document.getElementById('bt-empty').style.display = trades.length === 0 ? '' : 'none';
+
+                setTimeout(function() {
+                    document.getElementById('bt-progress').classList.remove('visible');
+                }, 1500);
+            } catch (err) {
+                alert('Failed to load backtest results: ' + err.message);
+            }
+
+            document.getElementById('bt-run-btn').disabled = false;
+            document.getElementById('bt-run-btn').textContent = 'Run Backtest';
+        }
+
+        function renderBreakdown(tableId, data) {
+            var tbody = document.querySelector('#' + tableId + ' tbody');
+            if (!data || Object.keys(data).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-muted);">No data</td></tr>';
+                return;
+            }
+            tbody.innerHTML = Object.entries(data).map(function(entry) {
+                var name = entry[0];
+                var d = entry[1];
+                var retClass = d.avg_return >= 0 ? 'pnl-positive' : 'pnl-negative';
+                return '<tr><td>' + esc(name) + '</td><td>' + d.total + '</td><td>' + d.win_rate + '%</td><td class="' + retClass + '">' + (d.avg_return >= 0 ? '+' : '') + d.avg_return + '%</td></tr>';
+            }).join('');
+        }
+
+        function formatRegime(r) {
+            if (r === 'confirmed_uptrend') return '<span style="color:var(--success);">Uptrend</span>';
+            if (r === 'uptrend_under_pressure') return '<span style="color:var(--warning);">Pressure</span>';
+            return '<span style="color:var(--text-muted);">' + esc(r || 'unknown') + '</span>';
+        }
     </script>
 </body>
 </html>

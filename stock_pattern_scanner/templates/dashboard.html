@@ -462,7 +462,8 @@
             border-top-color: var(--border);
         }
         .tooltip-trigger:hover .tooltip-text,
-        .tooltip-trigger:focus .tooltip-text {
+        .tooltip-trigger:focus .tooltip-text,
+        .tooltip-trigger.active .tooltip-text {
             display: block;
         }
         /* Prevent tooltips from going off-screen on the left/right */
@@ -1602,6 +1603,20 @@
             if (r === 'uptrend_under_pressure') return '<span style="color:var(--warning);">Pressure</span>';
             return '<span style="color:var(--text-muted);">' + esc(r || 'unknown') + '</span>';
         }
+
+        // --- Tooltip click-to-toggle ---
+        document.addEventListener('click', function(e) {
+            var trigger = e.target.closest('.tooltip-trigger');
+            // Close all other open tooltips
+            document.querySelectorAll('.tooltip-trigger.active').forEach(function(t) {
+                if (t !== trigger) t.classList.remove('active');
+            });
+            // Toggle the clicked one
+            if (trigger) {
+                e.stopPropagation();
+                trigger.classList.toggle('active');
+            }
+        });
 
         // --- Help Panel ---
         function toggleHelpPanel() {

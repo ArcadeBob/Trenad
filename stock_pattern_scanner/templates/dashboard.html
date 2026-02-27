@@ -409,6 +409,86 @@
             textarea { width: 100%; }
             .metrics-grid { grid-template-columns: repeat(2, 1fr); }
             .breakdown-grid { grid-template-columns: 1fr; }
+            .tooltip-trigger .tooltip-text { width: 220px; }
+        }
+
+        /* Tooltips */
+        .tooltip-trigger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: help;
+            position: relative;
+            margin-left: 4px;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+        .tooltip-trigger:hover { background: rgba(88, 166, 255, 0.3); }
+        .tooltip-trigger .tooltip-text {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.5;
+            color: var(--text-primary);
+            width: 280px;
+            text-transform: none;
+            letter-spacing: normal;
+            white-space: normal;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            pointer-events: none;
+        }
+        .tooltip-trigger .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--border);
+        }
+        .tooltip-trigger:hover .tooltip-text,
+        .tooltip-trigger:focus .tooltip-text {
+            display: block;
+        }
+        /* Prevent tooltips from going off-screen on the left/right */
+        .tooltip-trigger .tooltip-text.tooltip-right {
+            left: 0;
+            transform: none;
+        }
+        .tooltip-trigger .tooltip-text.tooltip-right::after {
+            left: 12px;
+            transform: none;
+        }
+        .tooltip-trigger .tooltip-text.tooltip-left {
+            left: auto;
+            right: 0;
+            transform: none;
+        }
+        .tooltip-trigger .tooltip-text.tooltip-left::after {
+            left: auto;
+            right: 12px;
+            transform: none;
+        }
+        /* Inline tooltip within table headers — needs to sit next to text */
+        thead th .tooltip-trigger {
+            display: inline-flex;
+            vertical-align: middle;
         }
     </style>
 </head>

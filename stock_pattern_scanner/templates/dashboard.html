@@ -409,7 +409,6 @@
             textarea { width: 100%; }
             .metrics-grid { grid-template-columns: repeat(2, 1fr); }
             .breakdown-grid { grid-template-columns: 1fr; }
-            .tooltip-trigger .tooltip-text { width: 220px; }
         }
 
         /* Tooltips */
@@ -489,6 +488,10 @@
         thead th .tooltip-trigger {
             display: inline-flex;
             vertical-align: middle;
+        }
+
+        @media (max-width: 768px) {
+            .tooltip-trigger .tooltip-text { width: 220px; }
         }
 
         /* Help panel */

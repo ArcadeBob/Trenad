@@ -1605,18 +1605,23 @@
         }
 
         // --- Tooltip click-to-toggle ---
+        // Use capture phase so this fires BEFORE the table sort handler
         document.addEventListener('click', function(e) {
             var trigger = e.target.closest('.tooltip-trigger');
-            // Close all other open tooltips
-            document.querySelectorAll('.tooltip-trigger.active').forEach(function(t) {
-                if (t !== trigger) t.classList.remove('active');
-            });
-            // Toggle the clicked one
             if (trigger) {
                 e.stopPropagation();
+                // Close all other open tooltips
+                document.querySelectorAll('.tooltip-trigger.active').forEach(function(t) {
+                    if (t !== trigger) t.classList.remove('active');
+                });
                 trigger.classList.toggle('active');
+                return;
             }
-        });
+            // Click elsewhere — close all tooltips
+            document.querySelectorAll('.tooltip-trigger.active').forEach(function(t) {
+                t.classList.remove('active');
+            });
+        }, true);
 
         // --- Help Panel ---
         function toggleHelpPanel() {

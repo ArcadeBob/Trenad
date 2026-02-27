@@ -1311,8 +1311,9 @@
             });
         }
 
-        // Table header click => sort
+        // Table header click => sort (ignore clicks on tooltip triggers)
         document.getElementById('table-head').addEventListener('click', function(e) {
+            if (e.target.closest('.tooltip-trigger')) return;
             const th = e.target.closest('th');
             if (!th) return;
             const col = th.getAttribute('data-col');

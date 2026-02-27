@@ -647,15 +647,15 @@
                     <textarea id="bt-custom-tickers" placeholder="AAPL, MSFT, NVDA..."></textarea>
                 </div>
                 <div class="control-group">
-                    <label>Stop Loss %</label>
+                    <label>Stop Loss % <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">If a trade drops this percentage from your entry price, sell to limit losses. 7% is the classic CAN SLIM rule &mdash; keeps any single loss manageable.</span></span></label>
                     <input type="text" id="bt-stop-loss" value="7" style="width:60px;">
                 </div>
                 <div class="control-group">
-                    <label>Profit Target %</label>
+                    <label>Profit Target % <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">If a trade gains this percentage, sell to lock in profits. 20% gives roughly a 3:1 reward-to-risk ratio with a 7% stop loss.</span></span></label>
                     <input type="text" id="bt-profit-target" value="20" style="width:60px;">
                 </div>
                 <div class="control-group">
-                    <label>Min Confidence</label>
+                    <label>Min Confidence <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Only test pattern signals at or above this confidence score. Lower values include more trades (possibly lower quality). Higher values are more selective.</span></span></label>
                     <input type="text" id="bt-min-conf" value="40" style="width:60px;">
                 </div>
                 <div class="control-group">
@@ -680,42 +680,42 @@
             <div class="metrics-grid" id="bt-metrics" style="display:none;">
                 <div class="stat-card">
                     <div class="stat-value" id="bt-total-trades" style="color:var(--accent);">0</div>
-                    <div class="stat-label">Total Trades</div>
+                    <div class="stat-label">Total Trades <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Number of trades the backtest would have taken. More trades give more statistically reliable results.</span></span></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="bt-win-rate" style="color:var(--success);">0%</div>
-                    <div class="stat-label">Win Rate</div>
+                    <div class="stat-label">Win Rate <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Percentage of trades that were profitable. Above 50% is good, but even 40% win rates can be profitable if average wins are much larger than average losses.</span></span></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="bt-profit-factor-val" style="color:var(--accent);">0</div>
-                    <div class="stat-label">Profit Factor</div>
+                    <div class="stat-label">Profit Factor <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Total profits divided by total losses. Above 1.0 = profitable overall. Above 2.0 = very strong. Below 1.0 = losses exceeded profits.</span></span></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="bt-avg-return" style="color:var(--success);">0%</div>
-                    <div class="stat-label">Avg Return</div>
+                    <div class="stat-label">Avg Return <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Average percentage return across all trades (wins and losses combined). This is your expected return per trade.</span></span></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="bt-expectancy" style="color:var(--accent);">0%</div>
-                    <div class="stat-label">Expectancy</div>
+                    <div class="stat-label">Expectancy <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Expected profit per trade accounting for both win rate and win/loss sizes. Positive = strategy makes money over time. Higher is better.</span></span></div>
                 </div>
             </div>
 
             <!-- Breakdowns -->
             <div class="breakdown-grid" id="bt-breakdowns" style="display:none;">
                 <div class="breakdown-card">
-                    <h3>By Pattern Type</h3>
+                    <h3>By Pattern Type <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Shows how each pattern performed independently. Some patterns work better than others in certain market conditions.</span></span></h3>
                     <table class="breakdown-table" id="bt-by-pattern"><thead><tr><th>Pattern</th><th>Trades</th><th>Win Rate</th><th>Avg Return</th></tr></thead><tbody></tbody></table>
                 </div>
                 <div class="breakdown-card">
-                    <h3>By Confidence Band</h3>
+                    <h3>By Confidence Band <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Shows performance by signal quality. Higher confidence bands should have better win rates &mdash; if they don't, the scoring needs adjustment.</span></span></h3>
                     <table class="breakdown-table" id="bt-by-confidence"><thead><tr><th>Band</th><th>Trades</th><th>Win Rate</th><th>Avg Return</th></tr></thead><tbody></tbody></table>
                 </div>
                 <div class="breakdown-card">
-                    <h3>By Market Regime</h3>
+                    <h3>By Market Regime <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Shows strategy performance in different market conditions. Most pattern strategies work best in confirmed uptrends and poorly in corrections.</span></span></h3>
                     <table class="breakdown-table" id="bt-by-regime"><thead><tr><th>Regime</th><th>Trades</th><th>Win Rate</th><th>Avg Return</th></tr></thead><tbody></tbody></table>
                 </div>
                 <div class="breakdown-card">
-                    <h3>Win/Loss Summary</h3>
+                    <h3>Win/Loss Summary <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Compares average winning vs. losing trade sizes. A healthy strategy has average wins at least 2-3x larger than average losses.</span></span></h3>
                     <table class="breakdown-table" id="bt-winloss"><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody></tbody></table>
                 </div>
             </div>

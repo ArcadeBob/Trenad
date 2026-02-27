@@ -601,21 +601,21 @@
                 <thead>
                     <tr id="table-head">
                         <th data-col="ticker">Ticker <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="pattern_type">Pattern <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="confidence_score" class="sorted">Score <span class="sort-arrow">&#9660;</span></th>
-                        <th data-col="status">Status <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="buy_point">Buy Point <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="pattern_type">Pattern <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">The type of base pattern detected. Each represents a period of price consolidation before a potential move higher.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="confidence_score" class="sorted">Score <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Confidence score (0-100) measuring how closely this pattern matches the ideal formation. Based on depth, volume, trend strength, and relative strength. 75+ is high quality.</span></span> <span class="sort-arrow">&#9660;</span></th>
+                        <th data-col="status">Status <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Where the stock is relative to its buy point. "At Pivot" = ready to buy. "Near Pivot" = close, watch it. "Building" = still forming. "Extended" = moved too far past the buy point.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="buy_point">Buy Point <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The price where the pattern completes and a breakout occurs. This is the ideal entry price &mdash; buy when the stock crosses this level with strong volume.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="current_price">Price <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="distance_to_pivot">Dist % <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="base_depth">Depth % <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="base_length_weeks">Weeks <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="rs_rating">RS <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="volume_rating">Vol Rating <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="stop_loss_price">Stop Loss <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="profit_target_price">Target <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="volume_confirmation">Vol <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="above_50ma">50MA <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="above_200ma">200MA <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="distance_to_pivot">Dist % <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">How far the current price is from the buy point. Negative = still below (building). Near zero = at the buy point. Positive = already broken out.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="base_depth">Depth % <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">How far the stock pulled back from its peak to form the base. Shallower bases (12-20%) are generally stronger. Deeper bases (33-50%) are riskier.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="base_length_weeks">Weeks <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">How long the base has been forming. Longer bases (7+ weeks) are generally more reliable because they represent sustained institutional accumulation.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="rs_rating">RS <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Relative Strength (1-99) &mdash; how this stock performs vs. the S&amp;P 500. Above 80 = outperforming most stocks (good). Below 50 = lagging the market (avoid).</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="volume_rating">Vol Rating <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Volume accumulation/distribution grade (A through E). A = strong institutional buying. E = heavy selling. Look for A or B &mdash; they show big money flowing in.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="stop_loss_price">Stop Loss <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Suggested sell price if the trade goes against you (7% below buy point). Always use a stop loss &mdash; small losses are recoverable, large ones are not.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="profit_target_price">Target <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Suggested profit target (20% above buy point). Consider taking at least partial profits when the stock reaches this level.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="volume_confirmation">Vol <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Whether trading volume confirmed the breakout (40%+ surge above average). Breakouts without volume confirmation often fail.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="above_50ma">50MA <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Is the stock above its 50-day moving average? The 50MA acts as support in healthy uptrends. Stocks below it show short-term weakness.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="above_200ma">200MA <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Is the stock above its 200-day moving average? The 200MA represents the long-term trend. Stocks below it are in a long-term downtrend &mdash; avoid.</span></span> <span class="sort-arrow">&#9650;</span></th>
                     </tr>
                 </thead>
                 <tbody id="table-body"></tbody>

@@ -15,8 +15,9 @@ from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from constants import DEFAULT_MAX_WORKERS, SSE_POLL_INTERVAL
+from constants import DEFAULT_MAX_WORKERS, MIN_DATA_POINTS, SSE_POLL_INTERVAL
 from database import ScanDatabase
+from backtest import BacktestEngine, BacktestConfig, compute_metrics
 from excel_export import export_to_excel
 from market_regime import MarketRegime
 from pattern_scanner import PatternDetector, StockScanner
@@ -40,6 +41,14 @@ class ScanRequest(BaseModel):
     watchlist: str = "default"
     tickers: Optional[list[str]] = None
     min_score: float = 0
+
+
+class BacktestRequest(BaseModel):
+    watchlist: str = "default"
+    tickers: Optional[list[str]] = None
+    stop_loss_pct: float = 7.0
+    profit_target_pct: float = 20.0
+    min_confidence: float = 40.0
 
 
 def _run_scan(scan_id: str, tickers: list[str], min_score: float):
@@ -175,3 +184,119 @@ async def export_excel(scan_id: str):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         filename=f"pattern_scan_{scan_id}.xlsx",
     )
+
+
+def _run_backtest(bt_id: str, tickers: list[str], config: BacktestConfig):
+    """Run backtest in a background thread."""
+    import yfinance as yf
+
+    try:
+        # Fetch data for all tickers + SPY
+        spy = yf.Ticker("SPY")
+        spy_data = spy.history(period="2y")
+        if spy_data is None or len(spy_data) < MIN_DATA_POINTS:
+            db.update_backtest_status(bt_id, "failed: Could not fetch SPY data")
+            return
+
+        ticker_data = {}
+        for ticker in tickers:
+            try:
+                t = yf.Ticker(ticker)
+                df = t.history(period="2y")
+                if df is not None and len(df) >= MIN_DATA_POINTS:
+                    ticker_data[ticker] = df
+            except Exception as e:
+                logger.warning("Failed to fetch %s for backtest: %s", ticker, e)
+
+        if not ticker_data:
+            db.update_backtest_status(bt_id, "failed: No valid ticker data")
+            return
+
+        engine = BacktestEngine(
+            ticker_data=ticker_data,
+            spy_data=spy_data,
+            config=config,
+        )
+
+        def progress_cb(current: int, total: int):
+            db.update_backtest_progress(bt_id, current, total)
+
+        trades = engine.run(progress_callback=progress_cb)
+        metrics = compute_metrics(trades)
+
+        db.save_backtest_trades(bt_id, trades)
+        db.save_backtest_summary(
+            bt_id,
+            total_trades=metrics["total_trades"],
+            win_rate=metrics["win_rate"],
+            profit_factor=metrics["profit_factor"] if metrics["profit_factor"] != float("inf") else 999.0,
+        )
+        db.update_backtest_status(bt_id, "completed")
+    except Exception as e:
+        logger.error("Backtest %s failed: %s", bt_id, e, exc_info=True)
+        db.update_backtest_status(bt_id, f"failed: {e}")
+
+
+@app.post("/api/backtest")
+async def start_backtest(request: BacktestRequest):
+    tickers = resolve_watchlist(request.watchlist, request.tickers)
+    config = BacktestConfig(
+        stop_loss_pct=request.stop_loss_pct,
+        profit_target_pct=request.profit_target_pct,
+        min_confidence=request.min_confidence,
+    )
+    bt_id = db.create_backtest(
+        watchlist=request.watchlist,
+        tickers=tickers,
+        stop_loss_pct=config.stop_loss_pct,
+        profit_target_pct=config.profit_target_pct,
+        min_confidence=config.min_confidence,
+    )
+
+    thread = threading.Thread(
+        target=_run_backtest,
+        args=(bt_id, tickers, config),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"backtest_id": bt_id, "total_tickers": len(tickers)}
+
+
+@app.get("/api/backtest/{bt_id}/progress")
+async def backtest_progress(bt_id: str):
+    """SSE endpoint streaming backtest progress."""
+    async def event_generator():
+        while True:
+            progress = db.get_backtest_progress(bt_id)
+            data = json.dumps(progress)
+            yield f"data: {data}\n\n"
+
+            status = progress["status"]
+            if status in ("completed", "not_found") or status.startswith("failed"):
+                break
+            await asyncio.sleep(SSE_POLL_INTERVAL)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@app.get("/api/backtest/{bt_id}/results")
+async def get_backtest_results(bt_id: str):
+    trades = db.get_backtest_trades(bt_id)
+    summary = db.get_backtest_summary(bt_id)
+    metrics = compute_metrics(trades) if trades else {
+        "total_trades": 0, "win_rate": 0.0, "avg_return": 0.0,
+        "profit_factor": 0.0, "avg_win": 0.0, "avg_loss": 0.0,
+        "expectancy": 0.0, "by_pattern": {}, "by_confidence": {},
+        "by_regime": {},
+    }
+    return {
+        "backtest_id": bt_id,
+        "summary": summary,
+        "metrics": metrics,
+        "trades": trades,
+    }

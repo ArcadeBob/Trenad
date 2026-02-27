@@ -39,3 +39,23 @@ def test_start_scan():
 def test_get_results_pending():
     response = client.get("/api/scan/nonexistent/results")
     assert response.status_code == 200
+
+
+def test_start_backtest():
+    response = client.post("/api/backtest", json={
+        "watchlist": "custom",
+        "tickers": ["AAPL"],
+        "stop_loss_pct": 7.0,
+        "profit_target_pct": 20.0,
+        "min_confidence": 40.0,
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "backtest_id" in data
+
+
+def test_get_backtest_results_not_found():
+    response = client.get("/api/backtest/nonexistent/results")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["trades"] == []

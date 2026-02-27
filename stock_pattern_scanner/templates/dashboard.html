@@ -410,6 +410,7 @@
             .metrics-grid { grid-template-columns: repeat(2, 1fr); }
             .breakdown-grid { grid-template-columns: 1fr; }
             .tooltip-trigger .tooltip-text { width: 220px; }
+            .help-panel { width: 100%; right: -100%; }
         }
 
         /* Tooltips */
@@ -490,6 +491,143 @@
             display: inline-flex;
             vertical-align: middle;
         }
+
+        /* Help panel */
+        .help-btn {
+            background: rgba(88, 166, 255, 0.15);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            color: var(--accent);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .help-btn:hover { background: rgba(88, 166, 255, 0.3); }
+
+        .help-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .help-backdrop.open { display: block; }
+
+        .help-panel {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 400px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: right 0.25s ease;
+            padding: 24px;
+        }
+        .help-panel.open { right: 0; }
+
+        .help-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .help-panel-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .help-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+        .help-close-btn:hover { color: var(--text-primary); }
+
+        .help-section { margin-bottom: 28px; }
+        .help-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .help-section p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .help-section ol, .help-section ul {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+        .help-section li { margin-bottom: 6px; }
+        .help-section strong { color: var(--text-primary); }
+
+        .help-pattern-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .help-pattern-card h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .help-pattern-card p {
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .help-pattern-card .pattern-params {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .help-pattern-card svg {
+            display: block;
+            margin: 8px auto;
+        }
+
+        .glossary-term {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .glossary-term:last-child { border-bottom: none; }
+        .glossary-term dt {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .glossary-term dd {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -500,7 +638,10 @@
             <button class="tab-btn active" onclick="switchTab('scanner')">Scanner</button>
             <button class="tab-btn" onclick="switchTab('backtest')">Backtest</button>
         </div>
-        <div class="header-right">CAN SLIM Base Pattern Detection</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div class="header-right">CAN SLIM Base Pattern Detection</div>
+            <button class="help-btn" onclick="toggleHelpPanel()" title="Investor Guide">?</button>
+        </div>
     </div>
 
     <div class="container">
@@ -737,6 +878,228 @@
                 <h3>No backtest results yet</h3>
                 <p>Configure parameters and click Run Backtest to validate patterns.</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Help Panel Backdrop -->
+    <div class="help-backdrop" id="helpBackdrop" onclick="toggleHelpPanel()"></div>
+
+    <!-- Help Panel -->
+    <div class="help-panel" id="helpPanel">
+        <div class="help-panel-header">
+            <h2>Investor Guide</h2>
+            <button class="help-close-btn" onclick="toggleHelpPanel()">&times;</button>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="help-section">
+            <h3>What Is This App?</h3>
+            <p>This scanner finds stocks forming <strong>base patterns</strong> &mdash; specific price consolidation shapes that often come before major price moves. It's based on the <strong>CAN SLIM</strong> methodology developed by William O'Neil in <em>How to Make Money in Stocks</em>.</p>
+            <p>The app scans stocks, scores how closely each pattern matches the ideal textbook formation, and shows you which ones are closest to a <strong>buy point</strong> &mdash; the price level where a breakout is expected.</p>
+        </div>
+
+        <!-- How to Use -->
+        <div class="help-section">
+            <h3>How to Use the Scanner</h3>
+            <ol>
+                <li><strong>Pick a watchlist</strong> &mdash; Growth for curated picks, S&amp;P 500 or NASDAQ 100 for broader scans</li>
+                <li><strong>Set a minimum score</strong> &mdash; start with 50+ to see quality patterns</li>
+                <li><strong>Click Scan</strong> and wait for results</li>
+                <li><strong>Focus on "At Pivot" and "Near Pivot"</strong> stocks with scores of 75+</li>
+                <li><strong>Check quality filters</strong> &mdash; RS above 80, Vol Rating A or B, above both 50MA and 200MA</li>
+                <li><strong>Use the buy point</strong> as your entry price, set a stop loss 7% below</li>
+            </ol>
+        </div>
+
+        <!-- Pattern Guide -->
+        <div class="help-section">
+            <h3>Pattern Guide</h3>
+
+            <div class="help-pattern-card">
+                <h4 style="color:var(--badge-cup);">Cup &amp; Handle</h4>
+                <svg width="300" height="130" viewBox="0 0 300 130">
+                    <!-- Prior uptrend -->
+                    <path d="M10,100 L40,60 L70,35" fill="none" stroke="#58a6ff" stroke-width="2"/>
+                    <!-- Cup -->
+                    <path d="M70,35 Q80,38 95,70 Q120,110 150,110 Q180,110 205,70 Q220,38 230,35" fill="none" stroke="#58a6ff" stroke-width="2"/>
+                    <!-- Handle dip -->
+                    <path d="M230,35 Q240,38 248,50 Q255,42 265,35" fill="none" stroke="#58a6ff" stroke-width="2"/>
+                    <!-- Breakout -->
+                    <path d="M265,35 L290,20" fill="none" stroke="#58a6ff" stroke-width="2" stroke-dasharray="4,3"/>
+                    <!-- Buy point line -->
+                    <line x1="65" y1="35" x2="290" y2="35" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3"/>
+                    <!-- Labels -->
+                    <text x="15" y="118" fill="#8b949e" font-size="10">Prior Uptrend</text>
+                    <text x="120" y="100" fill="#8b949e" font-size="10" text-anchor="middle">Cup (12-33% deep)</text>
+                    <text x="248" y="60" fill="#8b949e" font-size="10">Handle</text>
+                    <text x="272" y="30" fill="#3fb950" font-size="10">Buy Point</text>
+                </svg>
+                <p>A U-shaped consolidation (the "cup") followed by a small pullback (the "handle"). The buy point is at the top of the cup. This is the most common and reliable pattern.</p>
+                <div class="pattern-params">Ideal depth: 12-33% | Duration: 7-65 weeks | Look for volume dry-up in the handle</div>
+            </div>
+
+            <div class="help-pattern-card">
+                <h4 style="color:var(--badge-deep-cup);">Deep Cup &amp; Handle</h4>
+                <svg width="300" height="140" viewBox="0 0 300 140">
+                    <!-- Prior uptrend -->
+                    <path d="M10,90 L40,50 L70,25" fill="none" stroke="#bc8cff" stroke-width="2"/>
+                    <!-- Deep cup -->
+                    <path d="M70,25 Q80,30 95,75 Q120,130 150,130 Q180,130 205,75 Q220,30 230,25" fill="none" stroke="#bc8cff" stroke-width="2"/>
+                    <!-- Handle -->
+                    <path d="M230,25 Q240,30 248,42 Q255,34 265,25" fill="none" stroke="#bc8cff" stroke-width="2"/>
+                    <!-- Breakout -->
+                    <path d="M265,25 L290,12" fill="none" stroke="#bc8cff" stroke-width="2" stroke-dasharray="4,3"/>
+                    <!-- Buy point line -->
+                    <line x1="65" y1="25" x2="290" y2="25" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3"/>
+                    <!-- Labels -->
+                    <text x="120" y="118" fill="#8b949e" font-size="10" text-anchor="middle">Cup (33-50% deep)</text>
+                    <text x="248" y="52" fill="#8b949e" font-size="10">Handle</text>
+                    <text x="272" y="20" fill="#3fb950" font-size="10">Buy Point</text>
+                    <text x="100" y="13" fill="#8b949e" font-size="9" font-style="italic">Forms in volatile markets</text>
+                </svg>
+                <p>Same shape as Cup &amp; Handle but with a deeper pullback (33-50%). These form in volatile or bear markets and carry more risk, but can produce large gains when they work.</p>
+                <div class="pattern-params">Depth: 33-50% | Duration: 7-65 weeks | Higher risk, higher reward</div>
+            </div>
+
+            <div class="help-pattern-card">
+                <h4 style="color:var(--badge-double-bottom);">Double Bottom</h4>
+                <svg width="300" height="130" viewBox="0 0 300 130">
+                    <!-- Prior uptrend -->
+                    <path d="M10,90 L30,55 L50,30" fill="none" stroke="#3fb950" stroke-width="2"/>
+                    <!-- First dip -->
+                    <path d="M50,30 Q70,40 85,95 Q95,100 105,95" fill="none" stroke="#3fb950" stroke-width="2"/>
+                    <!-- Middle peak -->
+                    <path d="M105,95 Q130,40 155,30" fill="none" stroke="#3fb950" stroke-width="2"/>
+                    <!-- Second dip -->
+                    <path d="M155,30 Q175,40 190,95 Q200,100 210,95" fill="none" stroke="#3fb950" stroke-width="2"/>
+                    <!-- Recovery and breakout -->
+                    <path d="M210,95 Q235,40 255,30" fill="none" stroke="#3fb950" stroke-width="2"/>
+                    <path d="M255,30 L280,15" fill="none" stroke="#3fb950" stroke-width="2" stroke-dasharray="4,3"/>
+                    <!-- Buy point line at middle peak -->
+                    <line x1="45" y1="30" x2="290" y2="30" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3"/>
+                    <!-- Labels -->
+                    <text x="85" y="118" fill="#8b949e" font-size="10" text-anchor="middle">First Low</text>
+                    <text x="195" y="118" fill="#8b949e" font-size="10" text-anchor="middle">Second Low</text>
+                    <text x="155" y="22" fill="#8b949e" font-size="10" text-anchor="middle">Middle Peak</text>
+                    <text x="262" y="25" fill="#3fb950" font-size="10">Buy Point</text>
+                </svg>
+                <p>A W-shaped pattern with two distinct lows near the same price level. The buy point is at the middle peak of the W. Shows the stock found strong price support twice &mdash; a bullish signal.</p>
+                <div class="pattern-params">Depth: 15-40% | Two lows within 5% of each other | Buy at the middle peak</div>
+            </div>
+
+            <div class="help-pattern-card">
+                <h4 style="color:var(--badge-flat-base);">Flat Base</h4>
+                <svg width="300" height="120" viewBox="0 0 300 120">
+                    <!-- Prior uptrend -->
+                    <path d="M10,100 L30,75 L60,50 L90,35" fill="none" stroke="#f0883e" stroke-width="2"/>
+                    <!-- Flat consolidation -->
+                    <path d="M90,35 L110,38 L130,42 L150,40 L170,44 L190,38 L210,42 L230,36 L250,40" fill="none" stroke="#f0883e" stroke-width="2"/>
+                    <!-- Breakout -->
+                    <path d="M250,40 L270,35 L290,20" fill="none" stroke="#f0883e" stroke-width="2" stroke-dasharray="4,3"/>
+                    <!-- Buy point line -->
+                    <line x1="85" y1="35" x2="290" y2="35" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3"/>
+                    <!-- Range band -->
+                    <rect x="90" y="33" width="160" height="14" fill="none" stroke="#8b949e" stroke-width="0.5" stroke-dasharray="2,2" rx="2"/>
+                    <!-- Labels -->
+                    <text x="20" y="115" fill="#8b949e" font-size="10">Prior Uptrend</text>
+                    <text x="170" y="62" fill="#8b949e" font-size="10" text-anchor="middle">Tight Range (&lt;15%)</text>
+                    <text x="272" y="30" fill="#3fb950" font-size="10">Buy Point</text>
+                </svg>
+                <p>A tight sideways consolidation where the stock trades in a very narrow range (less than 15%). Usually forms after a prior advance. The tightness shows institutions are quietly accumulating shares without driving the price down.</p>
+                <div class="pattern-params">Max depth: 15% | Duration: 5-15 weeks | Volume should contract during base</div>
+            </div>
+        </div>
+
+        <!-- Reading Your Results -->
+        <div class="help-section">
+            <h3>Reading Your Results</h3>
+            <p>After a scan completes, focus on these key areas:</p>
+            <ul>
+                <li><strong>Score 75+</strong> = high-quality pattern that closely matches the ideal formation</li>
+                <li><strong>"At Pivot" status</strong> = the stock is at its buy point, potentially actionable now</li>
+                <li><strong>RS 80+</strong> = stock is outperforming most of the market (institutional demand)</li>
+                <li><strong>Vol Rating A or B</strong> = institutions are accumulating (buying) the stock</li>
+                <li><strong>Above 50MA and 200MA</strong> = both short-term and long-term trends are healthy</li>
+                <li><strong>Volume confirmed (&#10003;)</strong> = the breakout had strong volume support</li>
+            </ul>
+            <p>The <strong>buy point</strong> is your entry price. Set your <strong>stop loss</strong> 7% below it to protect against failed breakouts. Your <strong>profit target</strong> of 20% above gives a healthy 3:1 risk/reward ratio.</p>
+        </div>
+
+        <!-- Understanding the Backtest -->
+        <div class="help-section">
+            <h3>Understanding the Backtest</h3>
+            <p>The backtest replays 2 years of historical data, detects patterns that formed in the past, and simulates what would have happened if you traded every signal using your stop loss and profit target settings.</p>
+            <p><strong>Key metrics to watch:</strong></p>
+            <ul>
+                <li><strong>Win Rate above 50%</strong> is good, but even 40% can be profitable if avg wins >> avg losses</li>
+                <li><strong>Profit Factor above 1.5</strong> suggests a solid strategy</li>
+                <li><strong>Positive Expectancy</strong> means the strategy makes money over many trades</li>
+            </ul>
+            <p>Use the <strong>breakdown tables</strong> to see which patterns and market conditions produce the best results. Most patterns perform much better during confirmed uptrends.</p>
+            <p style="color:var(--warning);font-size:12px;margin-top:8px;"><em>Past performance does not guarantee future results. Use backtests to understand strategy behavior, not to predict exact returns.</em></p>
+        </div>
+
+        <!-- Glossary -->
+        <div class="help-section">
+            <h3>Glossary</h3>
+            <dl>
+                <div class="glossary-term">
+                    <dt>Base Pattern</dt>
+                    <dd>A period of price consolidation (sideways movement) after an advance. The stock is "resting" before potentially moving higher. Think of it as coiling a spring.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Buy Point / Pivot</dt>
+                    <dd>The price level where a base pattern completes and a breakout is expected. This is the ideal entry price for buying the stock.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>CAN SLIM</dt>
+                    <dd>An investment strategy by William O'Neil focusing on Current earnings, Annual earnings, New products/management, Supply and demand, Leader/laggard, Institutional sponsorship, and Market direction.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Confidence Score</dt>
+                    <dd>A 0-100 rating measuring how closely a detected pattern matches the ideal formation. Factors include depth, volume profile, trend strength, relative strength, and breakout quality.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Distribution Day</dt>
+                    <dd>A day where the S&amp;P 500 closes down more than 0.2% on volume higher than the previous day. Clusters of distribution days signal institutional selling and potential market corrections.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Expectancy</dt>
+                    <dd>The average expected profit per trade, factoring in both win rate and the relative sizes of wins vs losses. Positive expectancy means the strategy is profitable over time.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Market Regime</dt>
+                    <dd>The overall market condition: "Confirmed Uptrend" (healthy, good for buying), "Under Pressure" (caution), or "In Correction" (avoid new buys). Based on S&amp;P 500 trend and distribution day count.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Moving Average (50/200-day)</dt>
+                    <dd>The average closing price over the last 50 or 200 trading days. Acts as a trend indicator &mdash; price above = healthy trend, price below = weakening. The 200MA represents the long-term trend.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Profit Factor</dt>
+                    <dd>Total gross profits divided by total gross losses. Above 1.0 = profitable, above 2.0 = strong strategy. Below 1.0 = losing money overall.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Relative Strength (RS)</dt>
+                    <dd>A 1-99 rating comparing a stock's price performance to the S&amp;P 500. An RS of 90 means the stock outperformed 90% of all stocks. Look for 80+ for leading stocks.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Stop Loss</dt>
+                    <dd>A pre-set price where you'll sell if the trade goes against you. The default 7% rule limits any single loss to a manageable amount. Never hold through a broken stop loss.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Volume Confirmation</dt>
+                    <dd>When a stock breaks out above its buy point with trading volume at least 40% above its average. This confirms institutional participation and increases breakout reliability.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Volume Rating (A-E)</dt>
+                    <dd>Grades institutional activity: A = heavy buying (accumulation), B = moderate buying, C = neutral, D = moderate selling, E = heavy selling (distribution). Look for A or B.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Win Rate</dt>
+                    <dd>The percentage of trades that ended profitably. A useful but incomplete metric &mdash; a 40% win rate can still be very profitable if winners are much larger than losers.</dd>
+                </div>
+            </dl>
         </div>
     </div>
 
@@ -1232,6 +1595,17 @@
             if (r === 'uptrend_under_pressure') return '<span style="color:var(--warning);">Pressure</span>';
             return '<span style="color:var(--text-muted);">' + esc(r || 'unknown') + '</span>';
         }
+
+        // --- Help Panel ---
+        function toggleHelpPanel() {
+            document.getElementById('helpPanel').classList.toggle('open');
+            document.getElementById('helpBackdrop').classList.toggle('open');
+        }
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('helpPanel').classList.contains('open')) {
+                toggleHelpPanel();
+            }
+        });
     </script>
 </body>
 </html>

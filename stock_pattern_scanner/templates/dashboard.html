@@ -432,10 +432,7 @@
         .tooltip-trigger:hover { background: rgba(88, 166, 255, 0.3); }
         .tooltip-trigger .tooltip-text {
             display: none;
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
+            position: fixed;
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
             border-radius: 6px;
@@ -448,42 +445,14 @@
             text-transform: none;
             letter-spacing: normal;
             white-space: normal;
-            z-index: 100;
+            z-index: 10000;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
             pointer-events: none;
-        }
-        .tooltip-trigger .tooltip-text::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent;
-            border-top-color: var(--border);
         }
         .tooltip-trigger:hover .tooltip-text,
         .tooltip-trigger:focus .tooltip-text,
         .tooltip-trigger.active .tooltip-text {
             display: block;
-        }
-        /* Prevent tooltips from going off-screen on the left/right */
-        .tooltip-trigger .tooltip-text.tooltip-right {
-            left: 0;
-            transform: none;
-        }
-        .tooltip-trigger .tooltip-text.tooltip-right::after {
-            left: 12px;
-            transform: none;
-        }
-        .tooltip-trigger .tooltip-text.tooltip-left {
-            left: auto;
-            right: 0;
-            transform: none;
-        }
-        .tooltip-trigger .tooltip-text.tooltip-left::after {
-            left: auto;
-            right: 12px;
-            transform: none;
         }
         /* Inline tooltip within table headers — needs to sit next to text */
         thead th .tooltip-trigger {
@@ -1604,8 +1573,32 @@
             return '<span style="color:var(--text-muted);">' + esc(r || 'unknown') + '</span>';
         }
 
-        // --- Tooltip click-to-toggle ---
-        // Use capture phase so this fires BEFORE the table sort handler
+        // --- Tooltip positioning and click-to-toggle ---
+        function positionTooltip(trigger) {
+            var tip = trigger.querySelector('.tooltip-text');
+            if (!tip) return;
+            var rect = trigger.getBoundingClientRect();
+            var tipWidth = 280;
+            if (window.innerWidth <= 768) tipWidth = 220;
+            // Position above the trigger, centered
+            var left = rect.left + rect.width / 2 - tipWidth / 2;
+            var top = rect.top - 8;
+            // Clamp to viewport edges
+            if (left < 8) left = 8;
+            if (left + tipWidth > window.innerWidth - 8) left = window.innerWidth - tipWidth - 8;
+            tip.style.left = left + 'px';
+            tip.style.top = top + 'px';
+            tip.style.width = tipWidth + 'px';
+            tip.style.transform = 'translateY(-100%)';
+        }
+
+        // Position on hover
+        document.addEventListener('mouseenter', function(e) {
+            var trigger = e.target.closest('.tooltip-trigger');
+            if (trigger) positionTooltip(trigger);
+        }, true);
+
+        // Click-to-toggle (capture phase fires before table sort handler)
         document.addEventListener('click', function(e) {
             var trigger = e.target.closest('.tooltip-trigger');
             if (trigger) {
@@ -1615,6 +1608,9 @@
                     if (t !== trigger) t.classList.remove('active');
                 });
                 trigger.classList.toggle('active');
+                if (trigger.classList.contains('active')) {
+                    positionTooltip(trigger);
+                }
                 return;
             }
             // Click elsewhere — close all tooltips

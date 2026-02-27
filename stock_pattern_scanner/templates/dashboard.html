@@ -410,7 +410,6 @@
             .metrics-grid { grid-template-columns: repeat(2, 1fr); }
             .breakdown-grid { grid-template-columns: 1fr; }
             .tooltip-trigger .tooltip-text { width: 220px; }
-            .help-panel { width: 100%; right: -100%; }
         }
 
         /* Tooltips */
@@ -627,6 +626,10 @@
             font-size: 12px;
             color: var(--text-secondary);
             line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .help-panel { width: 100%; right: -100%; }
         }
     </style>
 </head>

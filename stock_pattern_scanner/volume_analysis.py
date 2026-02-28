@@ -127,7 +127,7 @@ class VolumeAnalyzer:
         return self.ad_rating() in ("D", "E")
 
     def score(self) -> float:
-        """Calculate volume profile score (0-20 points).
+        """Calculate volume profile score (0-15 points).
 
         Full marks for: A/D rating A or B, dry-up < 0.7, up/down ratio > 1.3.
         """

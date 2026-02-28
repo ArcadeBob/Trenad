@@ -87,7 +87,7 @@ from constants import (
     SCORE_BASE_LENGTH_MAX_V2,
     SCORE_BREAKOUT_QUALITY_MAX,
     SCORE_DEPTH_MAX,
-    SCORE_DEPTH_MAX_V2,
+
     SCORE_EARNINGS_MOMENTUM_MAX,
     SCORE_MINIMUM_VIABLE,
     SCORE_PATTERN_BONUS_MAX_V2,
@@ -652,9 +652,8 @@ class PatternDetector:
             ideal = CUP_DEEP_IDEAL_DEPTH_CENTER if pattern_type == "Deep Cup & Handle" else CUP_IDEAL_DEPTH_CENTER
             score += max(0, SCORE_DEPTH_MAX - abs(depth - ideal) * CUP_DEPTH_PENALTY)
 
-        # 2. Volume profile (15 pts — scale from VolumeAnalyzer 0-20 range)
-        scaled_volume = volume_score * (SCORE_VOLUME_PROFILE_MAX / 20.0)
-        score += scaled_volume
+        # 2. Volume profile (15 pts — from VolumeAnalyzer, already capped)
+        score += volume_score
 
         # 3. Price above 50-day MA (10 pts)
         current_close = df["Close"].iloc[-1]

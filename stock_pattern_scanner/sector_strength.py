@@ -142,10 +142,10 @@ class SectorAnalyzer:
 
         for period, weight in zip(RS_PERIODS, RS_WEIGHTS):
             if len(sector_close) >= period and len(spy_close) >= period:
-                s_ret = (sector_close.iloc[-1] / sector_close.iloc[-period] - 1) * 100
-                spy_ret = (spy_close.iloc[-1] / spy_close.iloc[-period] - 1) * 100
-                weighted_sector += float(s_ret) * weight
-                weighted_spy += float(spy_ret) * weight
+                s_ret = float(sector_close.iloc[-1]) / float(sector_close.iloc[-period]) - 1
+                spy_ret = float(spy_close.iloc[-1]) / float(spy_close.iloc[-period]) - 1
+                weighted_sector += s_ret * 100 * weight
+                weighted_spy += spy_ret * 100 * weight
             else:
                 weighted_sector += 0.0
                 weighted_spy += 0.0

@@ -1,5 +1,7 @@
 """Tests for the earnings analysis module."""
 
+from __future__ import annotations
+
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import date, timedelta

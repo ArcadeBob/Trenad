@@ -5,9 +5,14 @@ Provides two signals:
 2. Post-earnings momentum score (0-10 points)
 """
 
+from __future__ import annotations
+
+import logging
 import os
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 import requests
@@ -50,6 +55,7 @@ class EarningsAnalyzer:
                 return resp.json()
             return None
         except Exception:
+            logger.debug("FMP API call failed for endpoint: %s", endpoint, exc_info=True)
             return None
 
     def _fetch_earnings_calendar(self, ticker: str) -> str | None:
@@ -143,6 +149,7 @@ class EarningsAnalyzer:
             gap_pct = (close_after - close_before) / close_before * 100
             return gap_pct >= EARNINGS_GAP_UP_PCT
         except Exception:
+            logger.debug("Gap-up detection failed for %s", earnings_date_str, exc_info=True)
             return False
 
     def analyze(self, ticker: str,

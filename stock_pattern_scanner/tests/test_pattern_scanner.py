@@ -2,6 +2,7 @@ from unittest.mock import patch, MagicMock
 
 import numpy as np
 import pandas as pd
+from constants import SCORE_EARNINGS_MOMENTUM_MAX
 from pattern_scanner import PatternResult, PatternDetector, StockScanner
 
 
@@ -348,3 +349,77 @@ def test_death_cross_rejects_pattern(make_price_df):
 
     assert len(results) == 0
     assert scanner.skipped_death_cross >= 1
+
+
+def test_confidence_score_max_is_100(make_price_df):
+    """Total confidence score should not exceed 100."""
+    detector = PatternDetector()
+    # Create ideal pattern with all max scores
+    pattern = {
+        "pattern_type": "Flat Base",
+        "base_depth": 8.0,  # ideal depth for flat base
+        "volume_confirmation": True,
+        "base_length_weeks": 7,  # ideal length
+    }
+    # Ascending prices so current is above all MAs
+    closes = list(range(100, 300))
+    df = make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    # Pass maximum possible values for all external scores
+    score = detector.calculate_confidence(
+        pattern, df,
+        volume_score=20.0,       # max from VolumeAnalyzer
+        trend_score=10.0,        # max trend
+        rs_rating=95.0,          # strong RS
+        breakout_score=5.0,      # max breakout
+        earnings_momentum=10.0,  # max earnings
+        sector_adjustment=5.0,   # leading sector bonus
+    )
+    assert score <= 100.0
+
+
+def test_earnings_momentum_contributes_to_score(make_price_df):
+    """Earnings momentum should add up to 10 points."""
+    detector = PatternDetector()
+    pattern = {
+        "pattern_type": "Flat Base",
+        "base_depth": 8.0,
+        "volume_confirmation": True,
+        "base_length_weeks": 7,
+    }
+    closes = list(range(100, 300))
+    df = make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    score_without = detector.calculate_confidence(
+        pattern, df, earnings_momentum=0.0,
+    )
+    score_with = detector.calculate_confidence(
+        pattern, df, earnings_momentum=10.0,
+    )
+    diff = score_with - score_without
+    assert abs(diff - SCORE_EARNINGS_MOMENTUM_MAX) < 0.1
+
+
+def test_sector_overlay_reduces_score_for_lagging(make_price_df):
+    """Lagging sector should reduce confidence by 10 points."""
+    detector = PatternDetector()
+    pattern = {
+        "pattern_type": "Flat Base",
+        "base_depth": 8.0,
+        "volume_confirmation": True,
+        "base_length_weeks": 7,
+    }
+    closes = list(range(100, 300))
+    df = make_price_df(closes)
+    df = detector.add_moving_averages(df)
+
+    score_neutral = detector.calculate_confidence(
+        pattern, df, sector_adjustment=0.0,
+    )
+    score_lagging = detector.calculate_confidence(
+        pattern, df, sector_adjustment=-10.0,
+    )
+    diff = score_neutral - score_lagging
+    assert abs(diff - 10.0) < 0.1

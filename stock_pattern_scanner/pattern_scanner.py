@@ -88,6 +88,7 @@ from constants import (
     SCORE_BREAKOUT_QUALITY_MAX,
     SCORE_DEPTH_MAX,
     SCORE_DEPTH_MAX_V2,
+    SCORE_EARNINGS_MOMENTUM_MAX,
     SCORE_MINIMUM_VIABLE,
     SCORE_PATTERN_BONUS_MAX_V2,
     SCORE_RS_RATING_MAX,
@@ -608,45 +609,52 @@ class PatternDetector:
         trend_score: float = 0.0,
         rs_rating: float = 0.0,
         breakout_score: float = 0.0,
+        earnings_momentum: float = 0.0,
+        sector_adjustment: float = 0.0,
     ) -> float:
-        """Calculate confidence score (0-100) using revised institutional scoring.
+        """Calculate confidence score (0-100) using rebalanced scoring.
 
-        New scoring model (100 pts):
-        - Base depth: 15 pts
-        - Volume profile: 20 pts (from VolumeAnalyzer)
+        Scoring model (100 pts base):
+        - Base depth: 10 pts  (SCORE_DEPTH_MAX)
+        - Volume profile: 15 pts  (scaled from VolumeAnalyzer 0-20)
         - Above 50-day MA: 10 pts
         - Above 200-day MA: 5 pts
         - Tightness: 10 pts
         - Base length: 5 pts
         - Pattern bonuses: 10 pts
-        - Trend strength: 10 pts (from TrendAnalyzer)
+        - Trend strength: 10 pts  (from TrendAnalyzer)
         - RS rating: 10 pts
-        - Breakout quality: 5 pts (from BreakoutAnalyzer)
+        - Breakout quality: 5 pts  (from BreakoutAnalyzer)
+        - Earnings momentum: 10 pts
+
+        Post-adjustment (applied after base sum):
+        - Sector overlay: +5 leading / -10 lagging
         """
         score = 0.0
         pattern_type = pattern["pattern_type"]
         depth = pattern.get("base_depth", 0)
         length_weeks = pattern.get("base_length_weeks", 0)
 
-        # 1. Depth score (15 pts)
+        # 1. Depth score (10 pts — SCORE_DEPTH_MAX)
         if pattern_type == "Flat Base":
             if FLAT_BASE_IDEAL_DEPTH_LOW <= depth <= FLAT_BASE_IDEAL_DEPTH_HIGH:
-                score += SCORE_DEPTH_MAX_V2
+                score += SCORE_DEPTH_MAX
             elif depth < FLAT_BASE_IDEAL_DEPTH_LOW:
-                score += 8
+                score += SCORE_DEPTH_MAX * 8 / 15
             else:
-                score += max(0, SCORE_DEPTH_MAX_V2 - (depth - FLAT_BASE_IDEAL_DEPTH_HIGH) * FLAT_BASE_DEPTH_PENALTY)
+                score += max(0, SCORE_DEPTH_MAX - (depth - FLAT_BASE_IDEAL_DEPTH_HIGH) * FLAT_BASE_DEPTH_PENALTY)
         elif pattern_type == "Double Bottom":
             if DOUBLE_BOTTOM_IDEAL_DEPTH_LOW <= depth <= DOUBLE_BOTTOM_IDEAL_DEPTH_HIGH:
-                score += SCORE_DEPTH_MAX_V2
+                score += SCORE_DEPTH_MAX
             else:
-                score += max(0, SCORE_DEPTH_MAX_V2 - abs(depth - DOUBLE_BOTTOM_DEPTH_CENTER) * DOUBLE_BOTTOM_DEPTH_PENALTY)
+                score += max(0, SCORE_DEPTH_MAX - abs(depth - DOUBLE_BOTTOM_DEPTH_CENTER) * DOUBLE_BOTTOM_DEPTH_PENALTY)
         elif pattern_type in ("Cup & Handle", "Deep Cup & Handle"):
             ideal = CUP_DEEP_IDEAL_DEPTH_CENTER if pattern_type == "Deep Cup & Handle" else CUP_IDEAL_DEPTH_CENTER
-            score += max(0, SCORE_DEPTH_MAX_V2 - abs(depth - ideal) * CUP_DEPTH_PENALTY)
+            score += max(0, SCORE_DEPTH_MAX - abs(depth - ideal) * CUP_DEPTH_PENALTY)
 
-        # 2. Volume profile (20 pts — passed in from VolumeAnalyzer)
-        score += volume_score
+        # 2. Volume profile (15 pts — scale from VolumeAnalyzer 0-20 range)
+        scaled_volume = volume_score * (SCORE_VOLUME_PROFILE_MAX / 20.0)
+        score += scaled_volume
 
         # 3. Price above 50-day MA (10 pts)
         current_close = df["Close"].iloc[-1]
@@ -728,7 +736,14 @@ class PatternDetector:
         # 10. Breakout quality (5 pts — passed in from BreakoutAnalyzer)
         score += breakout_score
 
-        return round(min(100, max(0, score)), 1)
+        # 11. Earnings momentum (0-10 pts)
+        earnings_pts = min(earnings_momentum, SCORE_EARNINGS_MOMENTUM_MAX)
+        score += earnings_pts
+
+        # Apply sector overlay (post-adjustment, not part of 100-point base)
+        score += sector_adjustment
+
+        return max(1.0, min(100.0, round(score, 1)))
 
 
 class StockScanner:
@@ -834,6 +849,8 @@ class StockScanner:
                     trend_score=trend_score,
                     rs_rating=rs_rating,
                     breakout_score=breakout_score,
+                    earnings_momentum=0.0,
+                    sector_adjustment=0.0,
                 )
 
                 # Apply market regime penalty

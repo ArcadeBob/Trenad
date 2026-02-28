@@ -67,6 +67,7 @@ from constants import (
     FLAT_BASE_VOLUME_CONTRACTION,
     HANDLE_MAX_DECLINE_PCT,
     HANDLE_MAX_LENGTH_WEEKS,
+    MIN_AVG_DOLLAR_VOLUME,
     MIN_DATA_POINTS,
     PRIOR_UPTREND_LOOKBACK_DAYS,
     PRIOR_UPTREND_MIN_GAIN_PCT,
@@ -737,6 +738,7 @@ class StockScanner:
         self.tickers = tickers
         self.max_workers = max_workers
         self.detector = PatternDetector()
+        self.skipped_liquidity = 0
 
     def _fetch_data(self, ticker: str) -> pd.DataFrame | None:
         """Fetch 2 years of historical data for a ticker."""
@@ -759,6 +761,14 @@ class StockScanner:
             return []
 
         df = self.detector.add_moving_averages(df)
+
+        # Liquidity floor check
+        avg_vol_50 = df["AvgVolume50"].iloc[-1]
+        current_price = df["Close"].iloc[-1]
+        avg_dollar_volume = avg_vol_50 * current_price
+        if avg_dollar_volume < MIN_AVG_DOLLAR_VOLUME:
+            self.skipped_liquidity += 1
+            return []  # skip illiquid ticker
 
         # Trend strength analysis
         trend_analyzer = TrendAnalyzer(df)

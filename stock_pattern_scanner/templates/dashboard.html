@@ -999,8 +999,36 @@
                 <li><strong>Vol Rating A or B</strong> = institutions are accumulating (buying) the stock</li>
                 <li><strong>Above 50MA and 200MA</strong> = both short-term and long-term trends are healthy</li>
                 <li><strong>Volume confirmed (&#10003;)</strong> = the breakout had strong volume support</li>
+                <li><strong>Earnings "Beat" badge</strong> = recent earnings beat, confirming institutional demand</li>
+                <li><strong>Sector &uarr;</strong> = stock is in a leading sector, higher win probability</li>
+                <li><strong>Volume "Strong"</strong> = breakout backed by heavy institutional buying (80%+ surge)</li>
             </ul>
             <p>The <strong>buy point</strong> is your entry price. Set your <strong>stop loss</strong> 7% below it to protect against failed breakouts. Your <strong>profit target</strong> of 20% above gives a healthy 3:1 risk/reward ratio.</p>
+        </div>
+
+        <div class="help-section">
+            <h3>Earnings &amp; Timing</h3>
+            <p>Earnings reports are the single biggest risk for breakout trades. A stock can have a perfect pattern and still drop 20% on a bad earnings surprise.</p>
+            <p><strong>What the Earnings column tells you:</strong></p>
+            <ul>
+                <li><strong>Red badge (Xd)</strong> &mdash; Earnings within 7 days. Very high risk &mdash; consider waiting until after the report.</li>
+                <li><strong>Yellow badge (Xd)</strong> &mdash; Earnings within 14 days. Proceed with caution and smaller position sizes.</li>
+                <li><strong>Green "Beat" badge</strong> &mdash; The stock beat earnings estimates last quarter. This confirms institutional demand and adds up to 10 points to the confidence score.</li>
+                <li><strong>Plain number (Xd)</strong> &mdash; Days until earnings, no immediate concern.</li>
+            </ul>
+            <p>The ideal setup: buy a breakout <strong>3-5 weeks before earnings</strong> with a recent "Beat" &mdash; you get the momentum tailwind without imminent report risk.</p>
+        </div>
+
+        <div class="help-section">
+            <h3>Sector Strength</h3>
+            <p>Markets rotate between sectors. The best breakouts happen in <strong>leading sectors</strong> &mdash; sectors that are outperforming the S&amp;P 500. Patterns in lagging sectors fail roughly twice as often.</p>
+            <p><strong>How to read the Sector column:</strong></p>
+            <ul>
+                <li><strong>&uarr; (green arrow)</strong> &mdash; Leading sector. Outperforming the market. +5 confidence points.</li>
+                <li><strong>&rarr; (neutral)</strong> &mdash; In line with the market. No adjustment.</li>
+                <li><strong>&darr; (red arrow)</strong> &mdash; Lagging sector. Underperforming. -10 confidence point penalty.</li>
+            </ul>
+            <p>The sector score is calculated using the same relative strength formula as individual stocks, comparing each of the 11 GICS sector ETFs against the S&amp;P 500 over multiple timeframes.</p>
         </div>
 
         <!-- Understanding the Backtest -->
@@ -1034,16 +1062,36 @@
                     <dd>An investment strategy by William O'Neil focusing on Current earnings, Annual earnings, New products/management, Supply and demand, Leader/laggard, Institutional sponsorship, and Market direction.</dd>
                 </div>
                 <div class="glossary-term">
+                    <dt>Climactic Volume</dt>
+                    <dd>When breakout volume surges 150%+ above average. Counterintuitively, this often signals exhaustion &mdash; everyone who wanted to buy already did. These breakouts have higher failure rates.</dd>
+                </div>
+                <div class="glossary-term">
                     <dt>Confidence Score</dt>
                     <dd>A 0-100 rating measuring how closely a detected pattern matches the ideal formation. Factors include depth, volume profile, trend strength, relative strength, and breakout quality.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Death Cross</dt>
+                    <dd>When the 50-day moving average crosses below the 200-day moving average. Signals a structural downtrend. Patterns forming during a death cross are filtered out by the scanner.</dd>
                 </div>
                 <div class="glossary-term">
                     <dt>Distribution Day</dt>
                     <dd>A day where the S&amp;P 500 closes down more than 0.2% on volume higher than the previous day. Clusters of distribution days signal institutional selling and potential market corrections.</dd>
                 </div>
                 <div class="glossary-term">
+                    <dt>Dollar Volume</dt>
+                    <dd>Average daily trading volume in dollars (price &times; shares traded). The scanner requires $5M+ to ensure you can enter and exit positions without moving the price.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Earnings Surprise</dt>
+                    <dd>The percentage by which actual earnings per share (EPS) exceeded or missed analyst estimates. Positive surprises (beats) confirm institutional demand and add to the confidence score.</dd>
+                </div>
+                <div class="glossary-term">
                     <dt>Expectancy</dt>
                     <dd>The average expected profit per trade, factoring in both win rate and the relative sizes of wins vs losses. Positive expectancy means the strategy is profitable over time.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Golden Cross</dt>
+                    <dd>When the 50-day moving average crosses above the 200-day moving average. Signals a structural uptrend. The scanner requires this condition for pattern detection (except during market-wide corrections).</dd>
                 </div>
                 <div class="glossary-term">
                     <dt>Market Regime</dt>
@@ -1060,6 +1108,10 @@
                 <div class="glossary-term">
                     <dt>Relative Strength (RS)</dt>
                     <dd>A 1-99 rating comparing a stock's price performance to the S&amp;P 500. An RS of 90 means the stock outperformed 90% of all stocks. Look for 80+ for leading stocks.</dd>
+                </div>
+                <div class="glossary-term">
+                    <dt>Sector Relative Strength</dt>
+                    <dd>How a market sector (Technology, Healthcare, etc.) performs compared to the S&amp;P 500. Leading sectors produce more winning breakouts. Measured using the same multi-timeframe formula as individual stock RS.</dd>
                 </div>
                 <div class="glossary-term">
                     <dt>Stop Loss</dt>

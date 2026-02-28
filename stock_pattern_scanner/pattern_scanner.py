@@ -861,17 +861,24 @@ class StockScanner:
                     cached = self._db.get_earnings_cache(ticker) if hasattr(self, "_db") else None
                     if cached:
                         earnings_data = cached
+                        # Recompute proximity from cached next_earnings_date
+                        if cached.get("next_earnings_date"):
+                            proximity = self.earnings_analyzer._classify_proximity(
+                                cached["next_earnings_date"]
+                            )
+                            earnings_data["flag"] = proximity["flag"]
+                            earnings_data["days_until"] = proximity["days_until"]
                     else:
                         earnings_data = self.earnings_analyzer.analyze(ticker, df)
                         if hasattr(self, "_db"):
                             self._db.save_earnings_cache(ticker, earnings_data)
 
                 # Sector analysis
-                from sector_strength import SectorAnalyzer
                 sector_info = {"sector": "Unknown", "sector_rs": None, "sector_class": "neutral"}
                 if self.sector_analyzer:
                     sector_info = self.sector_analyzer.get_sector_info(ticker)
 
+                from sector_strength import SectorAnalyzer
                 sector_adj = SectorAnalyzer.confidence_adjustment(sector_info["sector_class"])
 
                 confidence = self.detector.calculate_confidence(

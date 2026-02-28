@@ -1,7 +1,8 @@
 """Market regime detection using SPY data.
 
 Determines whether the overall market is in a confirmed uptrend,
-under pressure, or in correction. Used as a hard gate by the scanner.
+under pressure, or in correction. Returns a confidence penalty that
+the scanner applies to pattern scores during corrections.
 """
 
 from __future__ import annotations

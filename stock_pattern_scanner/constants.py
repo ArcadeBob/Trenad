@@ -203,3 +203,73 @@ BACKTEST_DEFAULT_STOP_LOSS_PCT = 7.0
 BACKTEST_DEFAULT_PROFIT_TARGET_PCT = 20.0
 BACKTEST_DEFAULT_MIN_CONFIDENCE = 40.0
 BACKTEST_MAX_OPEN_TRADES_PER_TICKER = 1
+
+# ---------------------------------------------------------------------------
+# Earnings Analysis (FMP)
+# ---------------------------------------------------------------------------
+FMP_API_BASE_URL = "https://financialmodelingprep.com/api/v3"
+FMP_REQUEST_DELAY_MS = 300  # delay between FMP calls to respect rate limits
+FMP_CACHE_TTL_HOURS = 24  # cache earnings data for 24 hours
+
+# Earnings proximity thresholds (calendar days)
+EARNINGS_IMMINENT_DAYS = 7
+EARNINGS_SOON_DAYS = 14
+
+# Post-earnings momentum scoring
+EARNINGS_BEAT_MIN_PCT = 5.0  # minimum EPS surprise % for points
+EARNINGS_BEAT_STRONG_PCT = 15.0  # strong beat threshold
+EARNINGS_GAP_UP_PCT = 3.0  # stock gap-up on earnings day
+SCORE_EARNINGS_MOMENTUM_MAX = 10.0  # max points for earnings factor
+
+# ---------------------------------------------------------------------------
+# Sector Relative Strength
+# ---------------------------------------------------------------------------
+SECTOR_ETF_MAP = {
+    "Technology": "XLK",
+    "Healthcare": "XLV",
+    "Financial Services": "XLF",
+    "Consumer Cyclical": "XLY",
+    "Communication Services": "XLC",
+    "Industrials": "XLI",
+    "Consumer Defensive": "XLP",
+    "Energy": "XLE",
+    "Utilities": "XLU",
+    "Real Estate": "XLRE",
+    "Basic Materials": "XLB",
+}
+SECTOR_LEADING_THRESHOLD = 70  # RS above this = leading sector
+SECTOR_LAGGING_THRESHOLD = 50  # RS below this = lagging sector
+SECTOR_LEADING_BONUS = 5  # confidence points for leading sector
+SECTOR_LAGGING_PENALTY = -10  # confidence penalty for lagging sector
+SECTOR_CACHE_TTL_HOURS = 24
+
+# ---------------------------------------------------------------------------
+# Liquidity Floor
+# ---------------------------------------------------------------------------
+MIN_AVG_DOLLAR_VOLUME = 5_000_000  # $5M minimum avg daily dollar volume
+
+# ---------------------------------------------------------------------------
+# Scoring Rebalance
+# ---------------------------------------------------------------------------
+# Reduce depth from 15 to 10, volume from 20 to 15
+SCORE_DEPTH_MAX = 10.0  # was 15.0
+SCORE_VOLUME_PROFILE_MAX = 15.0  # was 20.0
+
+# ---------------------------------------------------------------------------
+# Volume Confirmation Grading
+# ---------------------------------------------------------------------------
+VOLUME_SURGE_WEAK_PCT = 20.0
+VOLUME_SURGE_MODERATE_PCT = 40.0  # was the only threshold
+VOLUME_SURGE_STRONG_PCT = 80.0
+VOLUME_SURGE_CLIMACTIC_PCT = 150.0
+
+SCORE_BREAKOUT_WEAK = 0.0
+SCORE_BREAKOUT_MODERATE = 2.0
+SCORE_BREAKOUT_CONFIRMED = 4.0
+SCORE_BREAKOUT_STRONG = 5.0
+SCORE_BREAKOUT_CLIMACTIC = 3.0  # penalty for exhaustion
+
+# ---------------------------------------------------------------------------
+# Market Regime Softening
+# ---------------------------------------------------------------------------
+REGIME_CORRECTION_CONFIDENCE_PENALTY = 15  # points deducted during corrections

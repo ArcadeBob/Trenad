@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from constants import (
+    REGIME_CORRECTION_CONFIDENCE_PENALTY,
     REGIME_CORRECTION_DISTRIBUTION_DAYS,
     REGIME_DISTRIBUTION_DAY_DECLINE_PCT,
     REGIME_DISTRIBUTION_DAY_LOOKBACK,
@@ -60,7 +61,7 @@ class MarketRegime:
 
         Returns:
             Dict with keys: status, spy_above_200ma, spy_above_50ma,
-            distribution_days, ma50_slope_rising.
+            distribution_days, ma50_slope_rising, confidence_penalty.
 
             status is one of: 'confirmed_uptrend', 'uptrend_under_pressure',
             'correction'.
@@ -82,10 +83,17 @@ class MarketRegime:
         else:
             status = "confirmed_uptrend"
 
+        # Confidence penalty by regime
+        if status == "correction":
+            penalty = REGIME_CORRECTION_CONFIDENCE_PENALTY
+        else:
+            penalty = 0
+
         return {
             "status": status,
             "spy_above_200ma": above_200,
             "spy_above_50ma": above_50,
             "distribution_days": dist_days,
             "ma50_slope_rising": slope_rising,
+            "confidence_penalty": penalty,
         }

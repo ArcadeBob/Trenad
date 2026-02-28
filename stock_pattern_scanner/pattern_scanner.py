@@ -836,6 +836,10 @@ class StockScanner:
                     breakout_score=breakout_score,
                 )
 
+                # Apply market regime penalty
+                confidence = confidence - getattr(self, "_regime_penalty", 0)
+                confidence = max(1, confidence)
+
                 if confidence < SCORE_MINIMUM_VIABLE:
                     continue  # Below minimum threshold
 
@@ -889,15 +893,10 @@ class StockScanner:
         self.market_regime = MarketRegime(spy_with_ma)
         regime = self.market_regime.evaluate()
         self._regime_status = regime["status"]
+        self._regime_penalty = regime.get("confidence_penalty", 0)
 
         if regime["status"] == "correction":
-            logger.info("Market in correction — no buy signals.")
-            # Still run progress callbacks so UI completes
-            total = len(self.tickers)
-            for i, ticker in enumerate(self.tickers):
-                if progress_callback:
-                    progress_callback(i + 1, total, ticker)
-            return []
+            logger.info("Market in correction — applying -%d confidence penalty.", self._regime_penalty)
 
         all_results: list[PatternResult] = []
         total = len(self.tickers)

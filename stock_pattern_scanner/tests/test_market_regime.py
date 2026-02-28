@@ -99,3 +99,37 @@ def test_evaluate_returns_required_keys():
     assert "spy_above_50ma" in result
     assert "distribution_days" in result
     assert "ma50_slope_rising" in result
+
+
+def test_evaluate_returns_confidence_penalty():
+    """Evaluation result should include confidence_penalty field."""
+    closes = [400 + (100 * i / 299) for i in range(300)]
+    df = _make_spy_df(closes)
+    regime = MarketRegime(df)
+    result = regime.evaluate()
+    assert "confidence_penalty" in result
+
+
+def test_correction_has_penalty():
+    """Correction status should carry -15 confidence penalty."""
+    # 250 days up, then 50 days sharp decline below 200-day MA
+    up = [400 + (100 * i / 249) for i in range(250)]
+    down = [500 - (150 * i / 49) for i in range(50)]
+    closes = up + down
+    # High volume on down days to create distribution days
+    volumes = [50_000_000] * 250 + [80_000_000] * 50
+    df = _make_spy_df(closes, volumes)
+    regime = MarketRegime(df)
+    result = regime.evaluate()
+    assert result["status"] == "correction"
+    assert result["confidence_penalty"] == 15
+
+
+def test_uptrend_has_no_penalty():
+    """Confirmed uptrend should carry zero confidence penalty."""
+    closes = [400 + (120 * i / 299) for i in range(300)]
+    df = _make_spy_df(closes)
+    regime = MarketRegime(df)
+    result = regime.evaluate()
+    assert result["status"] == "confirmed_uptrend"
+    assert result["confidence_penalty"] == 0

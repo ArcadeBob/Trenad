@@ -160,7 +160,7 @@ class ScanDatabase:
             ]:
                 try:
                     conn.execute(f"ALTER TABLE results ADD COLUMN {col} {coltype}")
-                except Exception:
+                except sqlite3.OperationalError:
                     pass  # column already exists
 
     def create_scan(self, watchlist: str, tickers: list[str]) -> str:

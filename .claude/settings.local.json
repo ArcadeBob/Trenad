@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/relmq/projects/Trenad/stock_pattern_scanner && pip install -r requirements.txt 2>&1)",
+      "Bash(cd \"C:/Users/relmq/projects/Trenad/stock_pattern_scanner\" && python -m pytest tests/test_pattern_scanner.py -v 2>&1)",
+      "Bash(cd \"C:/Users/relmq/projects/Trenad/stock_pattern_scanner\" && python -m pytest tests/test_ticker_lists.py -v 2>&1)",
+      "Bash(cd \"C:/Users/relmq/projects/Trenad/stock_pattern_scanner\" && python -m pytest tests/ -v 2>&1)",
+      "Bash(cd C:\\\\Users\\\\relmq\\\\projects\\\\Trenad\\\\stock_pattern_scanner:*)"
+    ]
+  }
+}

@@ -1,6 +1,8 @@
+from unittest.mock import patch, MagicMock
+
 import numpy as np
 import pandas as pd
-from pattern_scanner import PatternResult, PatternDetector
+from pattern_scanner import PatternResult, PatternDetector, StockScanner
 
 
 def test_pattern_result_creation():
@@ -295,3 +297,54 @@ def test_confidence_score_low_quality(make_price_df):
     df = detector.add_moving_averages(df)
     score = detector.calculate_confidence(pattern, df)
     assert score < 60
+
+
+def test_death_cross_rejects_pattern(make_price_df):
+    """Pattern should be rejected when 50MA < 200MA (death cross)."""
+    # Build data where recent prices have declined so that 50MA < 200MA.
+    # 500 data points: first 300 are high (~200), last 200 decline sharply.
+    # This makes the 50-day average much lower than the 200-day average.
+    high_phase = [200.0] * 300
+    decline = [200 - (100 * i / 200) for i in range(200)]  # 200 -> 100
+    closes = high_phase + decline
+    volumes = [2_000_000] * len(closes)
+
+    dates = pd.bdate_range(end="2026-02-20", periods=len(closes))
+    death_cross_df = pd.DataFrame({
+        "Open": closes,
+        "High": [c * 1.01 for c in closes],
+        "Low": [c * 0.99 for c in closes],
+        "Close": closes,
+        "Volume": volumes,
+    }, index=dates)
+
+    detector = PatternDetector()
+    death_cross_df = detector.add_moving_averages(death_cross_df)
+
+    # Verify that 50MA < 200MA (death cross condition)
+    assert death_cross_df["MA50"].iloc[-1] < death_cross_df["MA200"].iloc[-1]
+
+    scanner = StockScanner(tickers=["TEST"])
+    scanner._regime_status = "confirmed_uptrend"
+
+    # Mock _fetch_data to return our crafted dataframe
+    # Mock detect_flat_base to return a fake pattern so the gate is exercised
+    fake_pattern = {
+        "pattern_type": "Flat Base",
+        "base_depth": 10.0,
+        "volume_confirmation": True,
+        "base_length_weeks": 7,
+        "buy_point": 150.0,
+        "current_price": 148.0,
+        "distance_to_pivot": -1.33,
+    }
+
+    spy_df = make_price_df(list(range(100, 600)))
+    spy_df = detector.add_moving_averages(spy_df)
+
+    with patch.object(scanner, "_fetch_data", return_value=death_cross_df), \
+         patch.object(scanner.detector, "detect_flat_base", return_value=fake_pattern):
+        results = scanner._analyze_ticker("TEST", spy_df)
+
+    assert len(results) == 0
+    assert scanner.skipped_death_cross >= 1

@@ -739,6 +739,7 @@ class StockScanner:
         self.max_workers = max_workers
         self.detector = PatternDetector()
         self.skipped_liquidity = 0
+        self.skipped_death_cross = 0
 
     def _fetch_data(self, ticker: str) -> pd.DataFrame | None:
         """Fetch 2 years of historical data for a ticker."""
@@ -802,6 +803,14 @@ class StockScanner:
                 pattern = detect_fn(df)
                 if pattern is None:
                     continue
+
+                # 50MA > 200MA gate (death cross rejection)
+                ma50_val = df["MA50"].iloc[-1]
+                ma200_val = df["MA200"].iloc[-1]
+                if pd.notna(ma50_val) and pd.notna(ma200_val) and ma50_val < ma200_val:
+                    if getattr(self, "_regime_status", None) != "correction":
+                        self.skipped_death_cross += 1
+                        continue  # skip this pattern
 
                 # Volume analysis over the base period
                 base_start = pattern.get("base_start_idx", len(df) - pattern.get("base_length_weeks", 5) * 5)

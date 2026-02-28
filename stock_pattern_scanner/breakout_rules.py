@@ -15,8 +15,17 @@ from constants import (
     BREAKOUT_EXTENDED_PCT,
     BREAKOUT_VOLUME_SURGE_PCT,
     PROFIT_TARGET_PCT,
+    SCORE_BREAKOUT_CLIMACTIC,
+    SCORE_BREAKOUT_CONFIRMED,
+    SCORE_BREAKOUT_MODERATE,
     SCORE_BREAKOUT_QUALITY_MAX,
+    SCORE_BREAKOUT_STRONG,
+    SCORE_BREAKOUT_WEAK,
     STOP_LOSS_PCT,
+    VOLUME_SURGE_CLIMACTIC_PCT,
+    VOLUME_SURGE_MODERATE_PCT,
+    VOLUME_SURGE_STRONG_PCT,
+    VOLUME_SURGE_WEAK_PCT,
 )
 
 
@@ -35,12 +44,25 @@ class BreakoutAnalyzer:
         """20% above buy point."""
         return round(self.buy_point * (1 + PROFIT_TARGET_PCT / 100), 2)
 
+    def _volume_grade(self, surge_pct: float | None) -> tuple[str, float]:
+        """Grade volume surge and return (label, score_points)."""
+        if surge_pct is None or surge_pct < VOLUME_SURGE_WEAK_PCT:
+            return "Weak", SCORE_BREAKOUT_WEAK
+        if surge_pct < VOLUME_SURGE_MODERATE_PCT:
+            return "Moderate", SCORE_BREAKOUT_MODERATE
+        if surge_pct < VOLUME_SURGE_STRONG_PCT:
+            return "Confirmed", SCORE_BREAKOUT_CONFIRMED
+        if surge_pct < VOLUME_SURGE_CLIMACTIC_PCT:
+            return "Strong", SCORE_BREAKOUT_STRONG
+        return "Climactic", SCORE_BREAKOUT_CLIMACTIC
+
     def evaluate(self) -> dict:
         """Evaluate breakout quality.
 
         Returns:
             Dict with stop_loss_price, profit_target_price,
-            breakout_confirmed (True/False/None), volume_surge_pct.
+            breakout_confirmed (True/False/None), volume_surge_pct,
+            volume_grade, volume_grade_score.
         """
         df = self.df
         current_close = float(df["Close"].iloc[-1])
@@ -51,6 +73,8 @@ class BreakoutAnalyzer:
             "profit_target_price": self.profit_target_price(),
             "breakout_confirmed": None,
             "volume_surge_pct": None,
+            "volume_grade": "Weak",
+            "volume_grade_score": SCORE_BREAKOUT_WEAK,
         }
 
         # Price hasn't reached pivot yet
@@ -74,6 +98,11 @@ class BreakoutAnalyzer:
             result["volume_surge_pct"] = round(surge_pct, 1)
         else:
             surge_pct = 0.0
+
+        # Grade volume surge
+        grade_label, grade_score = self._volume_grade(result["volume_surge_pct"])
+        result["volume_grade"] = grade_label
+        result["volume_grade_score"] = grade_score
 
         # Check close in upper half of day's range
         day_high = float(df["High"].iloc[-1])
@@ -99,5 +128,5 @@ class BreakoutAnalyzer:
         """Breakout quality score (0-5 points)."""
         result = self.evaluate()
         if result["breakout_confirmed"] is True:
-            return SCORE_BREAKOUT_QUALITY_MAX
+            return result["volume_grade_score"]
         return 0.0

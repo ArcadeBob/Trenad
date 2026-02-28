@@ -105,3 +105,66 @@ def test_score_no_breakout():
     df = _make_df([100.0] * 100)
     ba = BreakoutAnalyzer(df, buy_point=150.0)
     assert ba.score() == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Volume grade tests
+# ---------------------------------------------------------------------------
+
+
+def _make_breakout_df(surge_pct: float) -> pd.DataFrame:
+    """Helper: create 100-bar DataFrame with last bar breaking out at given surge %."""
+    n = 100
+    avg_vol = 1_000_000
+    last_vol = avg_vol * (1 + surge_pct / 100)
+    closes = [100.0] * (n - 1) + [151.0]
+    volumes = [avg_vol] * (n - 1) + [int(last_vol)]
+    # Close in upper half of day's range so close_ok = True
+    highs = [c * 1.01 for c in closes[:-1]] + [152.0]
+    lows = [c * 0.99 for c in closes[:-1]] + [149.0]
+    return _make_df(closes, volumes, highs, lows)
+
+
+def test_volume_grade_weak():
+    """Volume surge <20% should grade as Weak with 0 pts."""
+    df = _make_breakout_df(surge_pct=10.0)
+    ba = BreakoutAnalyzer(df, buy_point=150.0)
+    result = ba.evaluate()
+    assert result["volume_grade"] == "Weak"
+    assert result["volume_grade_score"] == 0.0
+
+
+def test_volume_grade_moderate():
+    """Volume surge 20-39% should grade as Moderate with 2 pts."""
+    df = _make_breakout_df(surge_pct=30.0)
+    ba = BreakoutAnalyzer(df, buy_point=150.0)
+    result = ba.evaluate()
+    assert result["volume_grade"] == "Moderate"
+    assert result["volume_grade_score"] == 2.0
+
+
+def test_volume_grade_confirmed():
+    """Volume surge 40-79% should grade as Confirmed with 4 pts."""
+    df = _make_breakout_df(surge_pct=50.0)
+    ba = BreakoutAnalyzer(df, buy_point=150.0)
+    result = ba.evaluate()
+    assert result["volume_grade"] == "Confirmed"
+    assert result["volume_grade_score"] == 4.0
+
+
+def test_volume_grade_strong():
+    """Volume surge 80-149% should grade as Strong with 5 pts."""
+    df = _make_breakout_df(surge_pct=100.0)
+    ba = BreakoutAnalyzer(df, buy_point=150.0)
+    result = ba.evaluate()
+    assert result["volume_grade"] == "Strong"
+    assert result["volume_grade_score"] == 5.0
+
+
+def test_volume_grade_climactic():
+    """Volume surge 150%+ should grade as Climactic with 3 pts (warning)."""
+    df = _make_breakout_df(surge_pct=200.0)
+    ba = BreakoutAnalyzer(df, buy_point=150.0)
+    result = ba.evaluate()
+    assert result["volume_grade"] == "Climactic"
+    assert result["volume_grade_score"] == 3.0

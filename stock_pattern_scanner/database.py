@@ -121,6 +121,15 @@ class ScanDatabase:
                     market_regime TEXT,
                     FOREIGN KEY (backtest_id) REFERENCES backtests(backtest_id)
                 );
+                CREATE TABLE IF NOT EXISTS earnings_cache (
+                    ticker TEXT NOT NULL,
+                    next_earnings_date TEXT,
+                    last_4q_surprises TEXT,
+                    earnings_momentum_score REAL,
+                    earnings_gap_up INTEGER,
+                    fetched_at TEXT NOT NULL,
+                    PRIMARY KEY (ticker, fetched_at)
+                );
             """)
             # Migrate: add columns that may be missing from older schemas
             migrations = [
@@ -136,6 +145,23 @@ class ScanDatabase:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
                 except sqlite3.OperationalError:
                     pass  # Column already exists
+
+            # Migration: add earnings and sector columns to results
+            for col, coltype in [
+                ("earnings_days_until", "INTEGER"),
+                ("earnings_momentum_score", "REAL"),
+                ("earnings_flag", "TEXT"),
+                ("sector", "TEXT"),
+                ("sector_rs", "REAL"),
+                ("sector_class", "TEXT"),
+                ("avg_dollar_volume", "REAL"),
+                ("volume_grade", "TEXT"),
+                ("regime_penalty", "REAL"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE results ADD COLUMN {col} {coltype}")
+                except Exception:
+                    pass  # column already exists
 
     def create_scan(self, watchlist: str, tickers: list[str]) -> str:
         scan_id = str(uuid.uuid4())[:8]
@@ -187,8 +213,12 @@ class ScanDatabase:
                         current_price, distance_to_pivot, base_depth, base_length_weeks,
                         volume_confirmation, above_50ma, above_200ma, rs_rating, pattern_details,
                         stop_loss_price, profit_target_price, breakout_confirmed, volume_surge_pct,
-                        volume_rating, trend_score)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        volume_rating, trend_score,
+                        earnings_days_until, earnings_momentum_score, earnings_flag,
+                        sector, sector_rs, sector_class,
+                        avg_dollar_volume, volume_grade, regime_penalty)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                               ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         scan_id, r.ticker, r.pattern_type, r.confidence_score,
                         r.buy_point, r.current_price, r.distance_to_pivot,
@@ -199,6 +229,15 @@ class ScanDatabase:
                         r.stop_loss_price, r.profit_target_price,
                         None if r.breakout_confirmed is None else int(r.breakout_confirmed),
                         r.volume_surge_pct, r.volume_rating, r.trend_score,
+                        getattr(r, "earnings_days_until", None),
+                        getattr(r, "earnings_momentum_score", None),
+                        getattr(r, "earnings_flag", None),
+                        getattr(r, "sector", None),
+                        getattr(r, "sector_rs", None),
+                        getattr(r, "sector_class", None),
+                        getattr(r, "avg_dollar_volume", None),
+                        getattr(r, "volume_grade", None),
+                        getattr(r, "regime_penalty", None),
                     ),
                 )
 
@@ -213,7 +252,7 @@ class ScanDatabase:
         for row in rows:
             bc_raw = row["breakout_confirmed"]
             bc = None if bc_raw is None else bool(bc_raw)
-            results.append(PatternResult(
+            pr = PatternResult(
                 ticker=row["ticker"],
                 pattern_type=row["pattern_type"],
                 confidence_score=row["confidence_score"],
@@ -233,8 +272,68 @@ class ScanDatabase:
                 volume_surge_pct=row["volume_surge_pct"],
                 volume_rating=row["volume_rating"] or "C",
                 trend_score=row["trend_score"] or 0.0,
-            ))
+            )
+            # Attach new accuracy-improvement fields (added by migration,
+            # may not yet exist on the PatternResult dataclass).
+            for attr in (
+                "earnings_days_until", "earnings_momentum_score",
+                "earnings_flag", "sector", "sector_rs", "sector_class",
+                "avg_dollar_volume", "volume_grade", "regime_penalty",
+            ):
+                try:
+                    val = row[attr]
+                except (IndexError, KeyError):
+                    val = None
+                # Only set if PatternResult already has the field (future tasks
+                # will add them); otherwise stash in pattern_details.
+                if hasattr(pr, attr):
+                    object.__setattr__(pr, attr, val)
+                else:
+                    pr.pattern_details[attr] = val
+            results.append(pr)
         return results
+
+    # ------------------------------------------------------------------
+    # Earnings cache methods
+    # ------------------------------------------------------------------
+
+    def save_earnings_cache(self, ticker: str, data: dict):
+        """Cache earnings data for a ticker."""
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO earnings_cache
+                   (ticker, next_earnings_date, last_4q_surprises,
+                    earnings_momentum_score, earnings_gap_up, fetched_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (ticker, data.get("next_earnings_date"),
+                 json.dumps(data.get("surprises", [])),
+                 data.get("momentum_score", 0),
+                 1 if data.get("gap_up") else 0,
+                 datetime.now().isoformat())
+            )
+
+    def get_earnings_cache(self, ticker: str, max_age_hours: int = 24) -> dict | None:
+        """Get cached earnings data if fresh enough."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT next_earnings_date, last_4q_surprises,
+                          earnings_momentum_score, earnings_gap_up, fetched_at
+                   FROM earnings_cache
+                   WHERE ticker = ?
+                   ORDER BY fetched_at DESC LIMIT 1""",
+                (ticker,)
+            ).fetchone()
+        if not row:
+            return None
+        fetched_at = datetime.fromisoformat(row[4])
+        if (datetime.now() - fetched_at).total_seconds() > max_age_hours * 3600:
+            return None
+        return {
+            "next_earnings_date": row[0],
+            "surprises": json.loads(row[1]) if row[1] else [],
+            "momentum_score": row[2] or 0,
+            "gap_up": bool(row[3]),
+        }
 
     # ------------------------------------------------------------------
     # Backtest methods

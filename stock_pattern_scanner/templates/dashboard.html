@@ -721,6 +721,8 @@
                         <th data-col="pattern_type">Pattern <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">The type of base pattern detected. Each represents a period of price consolidation before a potential move higher.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="confidence_score" class="sorted">Score <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Confidence score (0-100) measuring how closely this pattern matches the ideal formation. Based on depth, volume, trend strength, and relative strength. 75+ is high quality.</span></span> <span class="sort-arrow">&#9660;</span></th>
                         <th data-col="status">Status <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Where the stock is relative to its buy point. "At Pivot" = ready to buy. "Near Pivot" = close, watch it. "Building" = still forming. "Extended" = moved too far past the buy point.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="earnings_flag">Earnings <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">Days until next earnings report. "Earnings Soon" (14 days) and "Earnings Imminent" (7 days) warn of upcoming risk. "Beat" means the last quarter beat estimates, boosting confidence.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="sector">Sector <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text">The stock's market sector and its relative strength. &uarr; = leading sector (outperforming market, +5 pts). &rarr; = neutral. &darr; = lagging sector (underperforming, -10 pts penalty). Best patterns appear in leading sectors.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="buy_point">Buy Point <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The price where the pattern completes and a breakout occurs. This is the ideal entry price &mdash; buy when the stock crosses this level with strong volume.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="current_price">Price <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="distance_to_pivot">Dist % <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">How far the current price is from the buy point. Negative = still below (building). Near zero = at the buy point. Positive = already broken out.</span></span> <span class="sort-arrow">&#9650;</span></th>
@@ -730,7 +732,7 @@
                         <th data-col="volume_rating">Vol Rating <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Volume accumulation/distribution grade (A through E). A = strong institutional buying. E = heavy selling. Look for A or B &mdash; they show big money flowing in.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="stop_loss_price">Stop Loss <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Suggested sell price if the trade goes against you (7% below buy point). Always use a stop loss &mdash; small losses are recoverable, large ones are not.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="profit_target_price">Target <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Suggested profit target (20% above buy point). Consider taking at least partial profits when the stock reaches this level.</span></span> <span class="sort-arrow">&#9650;</span></th>
-                        <th data-col="volume_confirmation">Vol <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Whether trading volume confirmed the breakout (40%+ surge above average). Breakouts without volume confirmation often fail.</span></span> <span class="sort-arrow">&#9650;</span></th>
+                        <th data-col="volume_confirmation">Vol <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Volume breakout grade. Weak = &lt;20% surge. Mod = 20-39%. &check; = 40-79% (confirmed). Strong = 80-149%. &amp;#9888; Climactic = 150%+ (exhaustion warning, often fails).</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="above_50ma">50MA <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Is the stock above its 50-day moving average? The 50MA acts as support in healthy uptrends. Stocks below it show short-term weakness.</span></span> <span class="sort-arrow">&#9650;</span></th>
                         <th data-col="above_200ma">200MA <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">Is the stock above its 200-day moving average? The 200MA represents the long-term trend. Stocks below it are in a long-term downtrend &mdash; avoid.</span></span> <span class="sort-arrow">&#9650;</span></th>
                     </tr>
@@ -1227,16 +1229,42 @@
 
             const tbody = document.getElementById('table-body');
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-muted);">No matching results</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="18" style="text-align:center;padding:30px;color:var(--text-muted);">No matching results</td></tr>';
                 return;
             }
 
             tbody.innerHTML = filtered.map(function(r) {
+                // Earnings column
+                var earningsCell = '';
+                if (r.earnings_flag === 'Earnings Imminent') {
+                    earningsCell = '<span class="status-badge" style="background:rgba(248,81,73,0.15);color:var(--danger);">' + r.earnings_days_until + 'd</span>';
+                } else if (r.earnings_flag === 'Earnings Soon') {
+                    earningsCell = '<span class="status-badge" style="background:rgba(210,153,34,0.15);color:var(--warning);">' + r.earnings_days_until + 'd</span>';
+                } else if (r.earnings_momentum_score >= 5) {
+                    earningsCell = '<span class="status-badge" style="background:rgba(63,185,80,0.15);color:var(--success);">Beat</span>';
+                } else if (r.earnings_days_until != null) {
+                    earningsCell = r.earnings_days_until + 'd';
+                } else {
+                    earningsCell = '-';
+                }
+
+                // Sector column
+                var sectorArrow = r.sector_class === 'leading' ? '&uarr;' : r.sector_class === 'lagging' ? '&darr;' : '&rarr;';
+                var sectorColor = r.sector_class === 'leading' ? 'var(--success)' : r.sector_class === 'lagging' ? 'var(--danger)' : 'var(--text-secondary)';
+                var sectorCell = '<span style="color:' + sectorColor + ';">' + sectorArrow + '</span> ' + esc(r.sector || '');
+
+                // Volume grade column (replace binary checkmark)
+                var volGradeColor = {'Weak':'var(--danger)','Moderate':'var(--warning)','Confirmed':'var(--success)','Strong':'var(--success)','Climactic':'var(--warning)'}[r.volume_grade] || 'var(--text-muted)';
+                var volGradeLabel = r.volume_grade === 'Confirmed' ? '&#10003;' : esc(r.volume_grade || '-');
+                var volCell = '<span style="color:' + volGradeColor + ';">' + volGradeLabel + '</span>';
+
                 return '<tr>' +
                     '<td><strong>' + esc(r.ticker) + '</strong></td>' +
                     '<td>' + patternBadge(r.pattern_type) + '</td>' +
                     '<td>' + scoreCell(r.confidence_score) + '</td>' +
                     '<td>' + statusBadge(r.status) + '</td>' +
+                    '<td>' + earningsCell + '</td>' +
+                    '<td>' + sectorCell + '</td>' +
                     '<td>$' + fmt(r.buy_point) + '</td>' +
                     '<td>$' + fmt(r.current_price) + '</td>' +
                     '<td>' + fmtPct(r.distance_to_pivot) + '</td>' +
@@ -1246,7 +1274,7 @@
                     '<td>' + (r.volume_rating || 'C') + '</td>' +
                     '<td>$' + fmt(r.stop_loss_price || 0) + '</td>' +
                     '<td>$' + fmt(r.profit_target_price || 0) + '</td>' +
-                    '<td>' + checkMark(r.volume_confirmation) + '</td>' +
+                    '<td>' + volCell + '</td>' +
                     '<td>' + checkMark(r.above_50ma) + '</td>' +
                     '<td>' + checkMark(r.above_200ma) + '</td>' +
                     '</tr>';
@@ -1387,7 +1415,7 @@
                     banner.innerHTML = 'Market: Uptrend Under Pressure \u2014 ' + data.distribution_days + ' distribution days <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The market is still in an uptrend but showing signs of stress from institutional selling. Be more selective with new buys and keep positions smaller.</span></span>';
                 } else if (data.status === 'correction') {
                     banner.className = 'market-banner correction';
-                    banner.innerHTML = 'Market: In Correction \u2014 Buy signals disabled <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The market is in a downtrend. Most breakouts fail during corrections \u2014 avoid new buys until the market confirms a new uptrend.</span></span>';
+                    banner.innerHTML = 'Market: In Correction &mdash; Confidence scores reduced by ' + (data.confidence_penalty || 15) + ' points <span class="tooltip-trigger" tabindex="0">i<span class="tooltip-text tooltip-left">The market is in a downtrend. Patterns detected during corrections have historically lower win rates. Confidence scores are reduced by ' + (data.confidence_penalty || 15) + ' points. Only the strongest setups survive this penalty &mdash; consider waiting for market confirmation.</span></span>';
                 } else {
                     banner.style.display = 'none';
                     return;

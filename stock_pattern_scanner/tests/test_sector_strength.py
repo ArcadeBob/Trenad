@@ -16,7 +16,7 @@ class TestSectorMapping:
         analyzer._sector_overrides = {"AAPL": "Technology"}
         assert analyzer._get_sector("AAPL") == "Technology"
 
-    def test_unknown_ticker_returns_none(self):
+    def test_unknown_ticker_falls_back_to_yfinance(self):
         analyzer = SectorAnalyzer.__new__(SectorAnalyzer)
         analyzer._ticker_sector_cache = {}
         analyzer._sector_overrides = {}

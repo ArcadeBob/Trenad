@@ -165,6 +165,15 @@ async def get_results(scan_id: str):
                 "volume_surge_pct": r.volume_surge_pct,
                 "volume_rating": r.volume_rating,
                 "trend_score": r.trend_score,
+                "earnings_flag": r.earnings_flag,
+                "earnings_days_until": r.earnings_days_until,
+                "earnings_momentum_score": r.earnings_momentum_score,
+                "sector": r.sector,
+                "sector_rs": r.sector_rs,
+                "sector_class": r.sector_class,
+                "avg_dollar_volume": r.avg_dollar_volume,
+                "volume_grade": r.volume_grade,
+                "regime_penalty": r.regime_penalty,
             }
             for r in results
         ],

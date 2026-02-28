@@ -134,16 +134,16 @@ class SectorAnalyzer:
     def _compute_rs(self, sector_df: pd.DataFrame,
                     spy_df: pd.DataFrame) -> float:
         """Compute RS of sector ETF vs SPY using same formula as stock RS."""
-        sector_close = sector_df["Close"]
-        spy_close = spy_df["Close"]
+        sector_close = sector_df["Close"].squeeze()
+        spy_close = spy_df["Close"].squeeze()
 
         weighted_sector = 0.0
         weighted_spy = 0.0
 
         for period, weight in zip(RS_PERIODS, RS_WEIGHTS):
             if len(sector_close) >= period and len(spy_close) >= period:
-                s_ret = float(sector_close.iloc[-1]) / float(sector_close.iloc[-period]) - 1
-                spy_ret = float(spy_close.iloc[-1]) / float(spy_close.iloc[-period]) - 1
+                s_ret = sector_close.iloc[-1].item() / sector_close.iloc[-period].item() - 1
+                spy_ret = spy_close.iloc[-1].item() / spy_close.iloc[-period].item() - 1
                 weighted_sector += s_ret * 100 * weight
                 weighted_spy += spy_ret * 100 * weight
             else:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
@@ -136,6 +137,16 @@ class PatternResult:
     volume_surge_pct: Optional[float] = None
     volume_rating: str = "C"
     trend_score: float = 0.0
+    # Earnings and sector fields
+    earnings_flag: str | None = None
+    earnings_days_until: int | None = None
+    earnings_momentum_score: float = 0.0
+    sector: str = "Unknown"
+    sector_rs: float | None = None
+    sector_class: str = "neutral"
+    avg_dollar_volume: float = 0.0
+    volume_grade: str = "Weak"
+    regime_penalty: float = 0.0
 
     @property
     def status(self) -> str:
@@ -752,6 +763,8 @@ class StockScanner:
         self.tickers = tickers
         self.max_workers = max_workers
         self.detector = PatternDetector()
+        self.earnings_analyzer = None  # initialized in scan()
+        self.sector_analyzer = None    # initialized in scan()
         self.skipped_liquidity = 0
         self.skipped_death_cross = 0
 
@@ -842,18 +855,38 @@ class StockScanner:
                 breakout_result = breakout_analyzer.evaluate()
                 breakout_score = breakout_analyzer.score()
 
+                # Earnings analysis (if FMP key configured)
+                earnings_data = {"momentum_score": 0, "flag": None, "days_until": None}
+                if self.earnings_analyzer:
+                    cached = self._db.get_earnings_cache(ticker) if hasattr(self, "_db") else None
+                    if cached:
+                        earnings_data = cached
+                    else:
+                        earnings_data = self.earnings_analyzer.analyze(ticker, df)
+                        if hasattr(self, "_db"):
+                            self._db.save_earnings_cache(ticker, earnings_data)
+
+                # Sector analysis
+                from sector_strength import SectorAnalyzer
+                sector_info = {"sector": "Unknown", "sector_rs": None, "sector_class": "neutral"}
+                if self.sector_analyzer:
+                    sector_info = self.sector_analyzer.get_sector_info(ticker)
+
+                sector_adj = SectorAnalyzer.confidence_adjustment(sector_info["sector_class"])
+
                 confidence = self.detector.calculate_confidence(
                     pattern, df,
                     volume_score=volume_score,
                     trend_score=trend_score,
                     rs_rating=rs_rating,
                     breakout_score=breakout_score,
-                    earnings_momentum=0.0,
-                    sector_adjustment=0.0,
+                    earnings_momentum=earnings_data["momentum_score"],
+                    sector_adjustment=sector_adj,
                 )
 
                 # Apply market regime penalty
-                confidence = confidence - getattr(self, "_regime_penalty", 0)
+                regime_penalty = getattr(self, "_regime_penalty", 0)
+                confidence = confidence - regime_penalty
                 confidence = max(1, confidence)
 
                 if confidence < SCORE_MINIMUM_VIABLE:
@@ -879,6 +912,15 @@ class StockScanner:
                     volume_surge_pct=breakout_result["volume_surge_pct"],
                     volume_rating=volume_rating,
                     trend_score=trend_score,
+                    earnings_flag=earnings_data.get("flag"),
+                    earnings_days_until=earnings_data.get("days_until"),
+                    earnings_momentum_score=earnings_data.get("momentum_score", 0.0),
+                    sector=sector_info["sector"],
+                    sector_rs=sector_info["sector_rs"],
+                    sector_class=sector_info["sector_class"],
+                    avg_dollar_volume=avg_dollar_volume,
+                    volume_grade=breakout_result.get("volume_grade", "Weak"),
+                    regime_penalty=regime_penalty,
                 )
                 results.append(result)
             except Exception as e:
@@ -913,6 +955,16 @@ class StockScanner:
 
         if regime["status"] == "correction":
             logger.info("Market in correction — applying -%d confidence penalty.", self._regime_penalty)
+
+        # Initialize sector analyzer and pre-load sector data
+        from sector_strength import SectorAnalyzer
+        self.sector_analyzer = SectorAnalyzer(spy_df=spy_df)
+        self.sector_analyzer.load_sector_data(spy_df)
+
+        # Initialize earnings analyzer
+        from earnings_analysis import EarningsAnalyzer
+        api_key = os.environ.get("FMP_API_KEY", "")
+        self.earnings_analyzer = EarningsAnalyzer(api_key=api_key) if api_key else None
 
         all_results: list[PatternResult] = []
         total = len(self.tickers)

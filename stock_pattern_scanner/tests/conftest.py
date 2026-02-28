@@ -30,6 +30,15 @@ _PATTERN_RESULT_DEFAULTS = dict(
     volume_surge_pct=None,
     volume_rating="C",
     trend_score=0.0,
+    earnings_flag=None,
+    earnings_days_until=None,
+    earnings_momentum_score=0.0,
+    sector="Unknown",
+    sector_rs=None,
+    sector_class="neutral",
+    avg_dollar_volume=0.0,
+    volume_grade="Weak",
+    regime_penalty=0.0,
 )
 
 

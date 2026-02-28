@@ -105,15 +105,15 @@ def test_updown_volume_ratio_bullish():
     assert ratio > 1.0
 
 
-def test_score_returns_0_to_20():
-    """Volume score must be in [0, 20]."""
+def test_score_returns_0_to_15():
+    """Volume score must be in [0, 15]."""
     n = 250
     closes = [100 + (50 * i / (n - 1)) for i in range(n)]
     volumes = [1_000_000] * n
     df, bs, be = _make_base_df(closes, volumes, 200, 249)
     analyzer = VolumeAnalyzer(df, bs, be)
     score = analyzer.score()
-    assert 0 <= score <= 20
+    assert 0 <= score <= 15
 
 
 def test_is_distributing_flag():

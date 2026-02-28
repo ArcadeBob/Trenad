@@ -58,6 +58,7 @@ def _run_scan(scan_id: str, tickers: list[str], min_score: float):
 
     try:
         scanner = StockScanner(tickers=tickers, max_workers=DEFAULT_MAX_WORKERS)
+        scanner._db = db
         results = scanner.scan(progress_callback=progress_cb)
 
         if min_score > 0:
